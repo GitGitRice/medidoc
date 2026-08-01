@@ -1,0 +1,47 @@
+# MediDoc
+
+Eine digitale Patientenakte für Arztpraxen. Die Praxis verwaltet ihre Patienten und die
+zu ihnen gehörenden Dokumente an einem Ort.
+
+## Language
+
+**Patient**:
+Eine Person, die in der Praxis behandelt wird. Zentrale Einheit der Anwendung — alles
+andere hängt an einem Patienten.
+_Avoid_: Kunde, Klient, Fall
+
+**Akte**:
+Die Gesamtheit aller Daten zu einem Patienten — Stammdaten und Dokumente. Es gibt genau
+eine Akte pro Patient; "Akte" und "Patient" sind daher keine getrennten Objekte, sondern
+zwei Sichten auf dasselbe.
+_Avoid_: Patientenakte (als eigenes Objekt), Dossier, Fallakte
+
+**Stammdaten**:
+Die beständigen Daten eines Patienten — Name, Geburtsdatum, Kontakt, Versicherung.
+Ändern sich selten und gehören dem Patienten selbst, nicht einem einzelnen Besuch.
+_Avoid_: Profil, Grunddaten
+
+**Dokument**:
+Ein Eintrag in der Akte eines Patienten — z. B. ein Befund oder ein Laborwert. Besteht
+immer aus strukturierten Angaben, deren Felder vom Dokumenttyp abhängen, und optional
+aus einem angehängten Anhang. Gehört immer zu genau einem Patienten.
+_Avoid_: Datei, Upload, Eintrag
+
+**Dokumenttyp**:
+Die Art eines Dokuments — z. B. Befund, Arztbrief, Laborwert. Bestimmt, welche Felder
+das Dokument hat. Neue Dokumenttypen sollen ohne Schemaänderung möglich sein.
+_Avoid_: Kategorie, Art, Klasse
+
+**Anhang**:
+Die eigentliche Datei zu einem Dokument, etwa ein PDF oder ein Scan. Ein Dokument kann
+höchstens einen Anhang haben; ein Dokument ohne Anhang ist gültig.
+_Avoid_: Datei, Attachment, Upload
+
+**Benutzer**:
+Eine Person, die sich in MediDoc anmeldet — also Praxispersonal, nicht der Patient.
+Ob zwischen Arzt und MFA unterschieden wird, ist bewusst offen.
+_Avoid_: User, Account, Nutzer
+
+**Patientenübersicht**:
+Die Listenansicht aller Patienten der Praxis — der Einstiegspunkt der Anwendung.
+_Avoid_: Dashboard, Patiententabelle

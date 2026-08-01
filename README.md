@@ -1,26 +1,40 @@
 # MediDoc
 
-Dokumentenverwaltung für Arztpraxen — Abschlussprojekt Modul 3, Syntax IT-Kurs.
+Eine digitale Patientenakte für Arztpraxen — Abschlussprojekt Modul 3, Syntax IT-Kurs.
 
-> **Status:** Konzeptphase. Idee und Scope werden aktuell erarbeitet, siehe `CONTEXT.md`.
+Die Praxis verwaltet ihre Patienten und die zu ihnen gehörenden Dokumente an einem Ort:
+Patientenübersicht als durchsuchbare Tabelle, Stammdatenpflege und eine Akte pro Patient,
+in der Befunde, Arztbriefe und Laborwerte abgelegt werden.
+
+> **Status:** Konzeptphase. Fachliche Begriffe in [CONTEXT.md](./CONTEXT.md),
+> Entscheidungen in [docs/adr/](./docs/adr/), Planungsvorschlag für Sprint 1 in
+> [docs/sprint-1-plan.md](./docs/sprint-1-plan.md).
 
 ## Team
 
-| Name | Rolle / Schwerpunkt |
-| ---- | ------------------- |
-| Steven Tanu | _tbd_ |
-| _tbd_ | _tbd_ |
-| _tbd_ | _tbd_ |
-| _tbd_ | _tbd_ |
+| Name | Strang |
+| ---- | ------ |
+| Steven Tanu | Auth |
+| _tbd_ | Infra & DevOps |
+| _tbd_ | Backend & Daten |
+| _tbd_ | Frontend |
 
 ## Tech-Stack
 
-_Wird in Sprint 1 festgelegt._ Angedacht:
-
-- **Frontend:** React (Vite)
-- **Backend:** FastAPI
-- **Datenbanken:** PostgreSQL (Patientenstammdaten) + MongoDB (Dokumente)
+- **Frontend:** React (Vite), React Router, Context API
+- **Backend:** FastAPI (Python)
+- **Datenbanken:** PostgreSQL für Patientenstammdaten, MongoDB für Dokumente
+  — Begründung in [ADR-0002](./docs/adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)
 - **Infrastruktur:** Docker Compose
+
+## Scope
+
+**Im Scope:** Authentifizierung, Patientenverwaltung (anlegen, suchen, bearbeiten,
+löschen), Akte pro Patient, Dokumente mit typabhängigen Feldern und optionalem Anhang.
+
+**Nicht im Scope:** Terminkalender, Abrechnung, e-Rezept, Volltextsuche in Anhängen,
+Versionierung, Anbindung echter Praxissoftware. Begründungen im
+[Sprint-1-Plan](./docs/sprint-1-plan.md#nicht-im-scope).
 
 ## Lokal starten
 
@@ -36,19 +50,22 @@ Zwei Sprints à eine Woche, Präsentation in Woche 3.
 
 ### Sprint 1 — _Woche 1_
 
-**Sprintziel:** _tbd (Montag, Sprint Planning)_
+**Sprintziel (Vorschlag, wird Montag beschlossen):** Ein Benutzer kann sich anmelden,
+sieht die Patientenübersicht als durchsuchbare Tabelle, kann einen Patienten öffnen und
+dessen Stammdaten sehen, und kann Patienten anlegen, bearbeiten und löschen. Läuft lokal
+über Docker Compose gegen PostgreSQL.
 
-| Aufgabe | Zuständig | Status |
-| ------- | --------- | ------ |
-| | | |
+Aufgabenverteilung siehe [Sprint-1-Plan](./docs/sprint-1-plan.md) und GitHub Issues.
 
 ### Sprint 2 — _Woche 2_
 
-**Sprintziel:** _tbd_
+**Sprintziel (Entwurf):** Dokumente in der Akte — anlegen mit typabhängigen Feldern,
+Anhang hochladen und wieder herunterladen, Dokumentenliste pro Patient. MongoDB kommt
+dazu.
 
-| Aufgabe | Zuständig | Status |
-| ------- | --------- | ------ |
-| | | |
+### Woche 3
+
+Test, Dokumentation, Abschlusspräsentation.
 
 ## Projekttagebuch
 
