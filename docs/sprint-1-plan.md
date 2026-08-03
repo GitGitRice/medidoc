@@ -21,10 +21,10 @@ blockieren.
 
 | # | Strang | Zuständig | Inhalt Sprint 1 | Inhalt Sprint 2 |
 | - | ------ | --------- | --------------- | --------------- |
-| **A** | Infra & DevOps | _tbd_ | Docker Compose, PostgreSQL-Service, `.env`, Setup-Doku | MongoDB-Service, Volume für Anhänge, ggf. Deployment |
-| **B** | Backend & Daten | _tbd_ | SQLModel `Patient`, Seed-Daten, CRUD-Endpunkte | Dokument-Endpunkte gegen MongoDB, Datei-Upload |
+| **A** | Infra & DevOps | Dominik | Docker Compose, PostgreSQL-Service, `.env`, Setup-Doku | MongoDB-Service, Volume für Anhänge, ggf. Deployment |
+| **B** | Backend & Daten | Tiran | SQLModel `Patient`, Seed-Daten, CRUD-Endpunkte | Dokument-Endpunkte gegen MongoDB, Datei-Upload |
 | **C** | Auth | Steven | User-Model, Login-Endpunkt, Token, `AuthContext` | ggf. Rollen (siehe ADR-0004) |
-| **D** | Frontend | _tbd_ | Patientenübersicht, Detailseite, Formulare, Routing | Dokumentenansicht, Upload-UI |
+| **D** | Frontend | Farhad | Patientenübersicht, Detailseite, Formulare, Routing | Dokumentenansicht, Upload-UI |
 
 **Bei nur drei Personen:** C geht in B auf — Auth und Backend sind dieselbe Codebasis.
 
