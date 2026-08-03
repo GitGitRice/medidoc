@@ -3,7 +3,9 @@ from urllib.parse import quote_plus
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+# app/core/config.py -> app/core -> app -> backend -> Repo-Wurzel.
+# Beim Verschieben dieser Datei muss die Zahl mitwandern.
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):

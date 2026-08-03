@@ -15,6 +15,26 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-
+  fastapi:
+    image: python:3.14-slim
+    container_name: mdoc-fastapi
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    environment:
+      # Im Compose-Netz heisst die Datenbank wie ihr Service, nicht localhost.
+      POSTGRES_HOST: postgres
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "
+             pip install --no-cache-dir -r requirements.txt &&
+             python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    restart: unless-stopped
 volumes:
   postgres_data:

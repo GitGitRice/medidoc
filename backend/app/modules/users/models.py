@@ -31,16 +31,3 @@ class User(SQLModel, table=True):
         default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),
     )
-
-
-class UserPublic(SQLModel):
-    """Response-Model: alles, was ein Benutzer nach außen sein darf.
-
-    Bewusst ohne password_hash. Endpunkte geben dieses Model zurück, niemals
-    User selbst.
-    """
-
-    id: int
-    email: str
-    name: str
-    role: Role

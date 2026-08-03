@@ -42,7 +42,22 @@ _Folgt, sobald das Setup steht._
 
 ## Projektstruktur
 
-_Folgt._
+```
+backend/            FastAPI-API, nach Features geschnitten — siehe backend/README.md
+backend/testdata/   200 erfundene Testpatienten als JSON, auch als Frontend-Mock nutzbar
+frontend/           React (Vite)
+docs/               ADRs, Sprint-Plan, API-Verträge
+```
+
+Aufbau und Zuständigkeiten stehen in [backend/README.md](./backend/README.md).
+
+## API-Verträge
+
+Damit Frontend und Backend parallel arbeiten können, steht die Form der Endpunkte fest,
+bevor sie fertig sind:
+
+- [docs/patients-api.md](./docs/patients-api.md) — Patientenübersicht, Stammdaten, CRUD
+- [docs/auth-api.md](./docs/auth-api.md) — Login, Token, Rollen
 
 ## Sprints
 

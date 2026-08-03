@@ -1,54 +1,48 @@
-"""Startbenutzer anlegen.
+"""Testdaten anlegen.
 
-Aufruf aus backend/:  python -m app.seed
+Aufruf aus `backend/`:
 
-Mehrfach ausführbar — vorhandene Benutzer werden übersprungen, nicht überschrieben.
-Die Zugangsdaten stehen in der .env im Repo-Wurzelverzeichnis. Reine Testdaten.
+    python -m app.seed                 alle Testpatienten aus testdata/
+    python -m app.seed --patients 50   nur die ersten 50
+
+Mehrfach ausführbar — Vorhandenes wird übersprungen, nicht überschrieben.
+Diese Datei ruft nur die Seeds der Module auf; die Daten selbst stehen jeweils
+im Modul, dem sie gehören. Ein neues Modul mit Testdaten kommt mit einer Zeile
+in `seed()` dazu.
 """
 
-from sqlmodel import Session, select
+import argparse
 
-from app.config import settings
-from app.db import engine, init_db
-from app.models import Role, User
-from app.security import hash_password
+from sqlmodel import Session
 
-
-def create_user(
-    session: Session, email: str, name: str, password: str, role: Role
-) -> bool:
-    """Legt einen Benutzer an. False, wenn die E-Mail schon vergeben ist."""
-    existing = session.exec(select(User).where(User.email == email)).first()
-    if existing:
-        return False
-
-    session.add(
-        User(
-            email=email,
-            name=name,
-            password_hash=hash_password(password),
-            role=role,
-        )
-    )
-    return True
+from app.db.base import init_db
+from app.db.session import engine
+from app.modules.patients.seed import seed_patients
+from app.modules.users.seed import seed_users
 
 
-def seed() -> None:
+def seed(patient_limit: int | None = None) -> None:
     init_db()
 
-    initial_users = [
-        (settings.seed_admin_email, "Anna Admin", settings.seed_admin_password, Role.ADMIN),
-        (settings.seed_staff_email, "Tom Staff", settings.seed_staff_password, Role.STAFF),
-    ]
-
+    # Eine Session und ein Commit für alle Module: Bricht ein Seed ab, bleibt
+    # die Datenbank im Zustand von vorher statt halb gefüllt.
     with Session(engine) as session:
-        for email, name, password, role in initial_users:
-            if create_user(session, email, name, password, role):
-                print(f"created:  {email} ({role})")
-            else:
-                print(f"exists:   {email} ({role})")
+        seed_users(session)
+        seed_patients(session, limit=patient_limit)
         session.commit()
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Testdaten anlegen.")
+    parser.add_argument(
+        "--patients",
+        type=int,
+        default=None,
+        metavar="N",
+        help="nur die ersten N Testpatienten anlegen (Standard: alle)",
+    )
+    seed(patient_limit=parser.parse_args().patients)
+
+
 if __name__ == "__main__":
-    seed()
+    main()
