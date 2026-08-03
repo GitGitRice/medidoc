@@ -15,9 +15,9 @@ in der Befunde, Arztbriefe und Laborwerte abgelegt werden.
 | Name | Strang |
 | ---- | ------ |
 | Steven Tanu | Auth |
-| _tbd_ | Infra & DevOps |
-| _tbd_ | Backend & Daten |
-| _tbd_ | Frontend |
+| Dominik | Infra & DevOps |
+| Tiran | Backend & Daten |
+| Farhad | Frontend |
 
 ## Tech-Stack
 
