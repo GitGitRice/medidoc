@@ -3,15 +3,19 @@ status: accepted
 supersedes: 0004
 ---
 
-# Zwei Rollen: Admin und Mitarbeiter
+# Zwei Rollen: `admin` und `staff`
 
 ADR-0004 hatte für Sprint 1 bewusst nur eine Rolle vorgesehen, um die Testfläche klein zu
-halten. Wir führen stattdessen von Anfang an zwei Rollen ein — `admin` und `mitarbeiter` —,
-weil das Rollenfeld selbst fast nichts kostet, das nachträgliche Einziehen aber teuer ist:
-eine Migration plus eine Anpassung an jeder bereits geschützten Route. Der eigentliche
-Einwand aus ADR-0004 bleibt trotzdem gültig und wird anders adressiert: Nicht die Anzahl
-der Rollen verdoppelt die Testfläche, sondern die Anzahl der Stellen, an denen geprüft
-wird. Sprint 1 prüft an genau **einer** Stelle.
+halten. Wir führen stattdessen von Anfang an zwei Rollen ein — `admin` und `staff` —, weil
+das Rollenfeld selbst fast nichts kostet, das nachträgliche Einziehen aber teuer ist: eine
+Migration plus eine Anpassung an jeder bereits geschützten Route. Der eigentliche Einwand
+aus ADR-0004 bleibt trotzdem gültig und wird anders adressiert: Nicht die Anzahl der Rollen
+verdoppelt die Testfläche, sondern die Anzahl der Stellen, an denen geprüft wird. Sprint 1
+prüft an genau **einer** Stelle.
+
+> **Sprache:** Code und API sind durchgehend englisch, deutsch ist nur die Oberfläche im
+> Frontend. Die Rolle heißt im Code und im JSON also `staff`, in dieser Begründung aus
+> Lesbarkeitsgründen weiterhin "Mitarbeiter".
 
 ## Rechte statt Berufe
 
@@ -25,8 +29,8 @@ ohne Konsequenz.
 
 | Rolle | Darf |
 | ----- | ---- |
-| `mitarbeiter` | Patienten lesen, anlegen, bearbeiten; Dokumente lesen und anlegen |
-| `admin` | alles von `mitarbeiter`, zusätzlich Patienten löschen und Benutzer verwalten |
+| `staff` | Patienten lesen, anlegen, bearbeiten; Dokumente lesen und anlegen |
+| `admin` | alles von `staff`, zusätzlich Patienten löschen und Benutzer verwalten |
 
 In Sprint 1 ist davon genau eine Zeile wirksam: **`DELETE /patienten/{id}` verlangt
 `admin`**, alles andere verlangt nur einen gültigen Token. Die Benutzerverwaltung
@@ -36,18 +40,18 @@ vorführbaren Rollenunterschied und keine Rollenlogik, die über die Anwendung v
 Löschen ist bewusst der Unterschied: Es ist die einzige Aktion, die Daten unwiederbringlich
 entfernt, und in einer echten Praxis auch die einzige, bei der eine Rückfrage üblich wäre.
 
-## Erweiterbarkeit: Mitarbeiter kann später aufgeteilt werden
+## Erweiterbarkeit: `staff` kann später aufgeteilt werden
 
-`mitarbeiter` kann später in `arzt` und `mfa` zerfallen. Wichtig für den Entwurf: Diese
+`staff` kann später in `doctor` und `assistant` zerfallen. Wichtig für den Entwurf: Diese
 beiden wären **gleichrangig**, nicht gestuft — die MFA pflegt Stammdaten, der Arzt schreibt
 Befunde, keiner ist eine Obermenge des anderen. Eine Prüfung nach dem Muster "Rolle
 mindestens X" würde dabei brechen.
 
 Deshalb wird von Anfang an mengenbasiert geprüft: eine Dependency
-`require_rollen(*erlaubte_rollen)`, die die Rolle des Benutzers gegen eine Menge erlaubter
+`require_roles(*allowed_roles)`, die die Rolle des Benutzers gegen eine Menge erlaubter
 Rollen hält. Bei zwei Rollen sieht das aus wie eine Hierarchie, bei vier Rollen trägt es
-trotzdem noch. Der Aufruf lautet also `require_rollen(Rolle.ADMIN)` und nicht
-`require_min_rolle(Rolle.ADMIN)`.
+trotzdem noch. Der Aufruf lautet also `require_roles(Role.ADMIN)` und nicht
+`require_min_role(Role.ADMIN)`.
 
 ## Speicherung
 
@@ -65,5 +69,5 @@ die Datenbank gewinnt hier nichts, was die API nicht ohnehin prüft.
   den Seed.
 - Das Ausblenden von Buttons im Frontend anhand der Rolle ist Bedienkomfort, keine
   Absicherung. Durchgesetzt wird ausschließlich im Backend.
-- Wenn `mitarbeiter` später aufgeteilt wird, gilt der Hinweis aus ADR-0004 unverändert:
-  erst die Tabelle "wer darf was" gemeinsam festlegen und abnehmen, dann implementieren.
+- Wenn `staff` später aufgeteilt wird, gilt der Hinweis aus ADR-0004 unverändert: erst die
+  Tabelle "wer darf was" gemeinsam festlegen und abnehmen, dann implementieren.

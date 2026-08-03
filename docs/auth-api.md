@@ -4,7 +4,10 @@
 > sind. Diese Datei ist die verbindliche Form. Ändert sich hier etwas, wird es hier
 > geändert und im Daily gesagt.
 >
-> Rollenmodell: [ADR-0005](./adr/0005-rollen-admin-und-mitarbeiter.md).
+> **Sprache:** Code und API sind englisch, deutsch ist nur die Oberfläche im Frontend.
+> JSON-Keys und Rollenwerte sind also englisch.
+>
+> Rollenmodell: [ADR-0005](./adr/0005-rollen-admin-und-staff.md).
 > Entscheidung für echte Auth: [ADR-0003](./adr/0003-echte-authentifizierung.md).
 
 Basis-URL lokal: `http://localhost:8000`
@@ -14,7 +17,7 @@ Basis-URL lokal: `http://localhost:8000`
 - Anmeldung liefert einen **JWT**, der als `Authorization: Bearer <token>` mitgeschickt wird.
 - Der Token liegt im Frontend in `localStorage`.
 - Jeder Endpunkt außer `POST /auth/login` verlangt einen gültigen Token.
-- Rollen: `admin` und `mitarbeiter`. In Sprint 1 prüft genau ein Endpunkt die Rolle.
+- Rollen: `admin` und `staff`. In Sprint 1 prüft genau ein Endpunkt die Rolle.
 
 ## POST /auth/login
 
@@ -40,11 +43,11 @@ username=anna.admin@medidoc.test&password=geheim123
 {
   "access_token": "eyJhbGciOiJIUzI1NiIs...",
   "token_type": "bearer",
-  "benutzer": {
+  "user": {
     "id": 1,
     "email": "anna.admin@medidoc.test",
     "name": "Anna Admin",
-    "rolle": "admin"
+    "role": "admin"
   }
 }
 ```
@@ -77,7 +80,7 @@ Authorization: Bearer <token>
   "id": 1,
   "email": "anna.admin@medidoc.test",
   "name": "Anna Admin",
-  "rolle": "admin"
+  "role": "admin"
 }
 ```
 
@@ -98,7 +101,7 @@ Ein `401` wegen abgelaufenem Token ist der Normalfall nach acht Stunden, kein Fe
 
 - Verfahren `HS256`, Secret aus `JWT_SECRET` in der `.env`
 - Laufzeit **8 Stunden** (eine Praxis-Schicht), kein Refresh-Token
-- Payload: `sub` (Benutzer-ID als String), `rolle`, `exp`
+- Payload: `sub` (Benutzer-ID als String), `role`, `exp`
 
 Die Rolle steht im Token, damit das Frontend die Oberfläche danach richten kann. Sie wird
 im Backend trotzdem bei jeder Prüfung aus der Datenbank gelesen — ein Token, der nach einer
@@ -119,8 +122,8 @@ const res = await fetch("http://localhost:8000/auth/login", {
 fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 ```
 
-`AuthContext` hält `benutzer` und `token`, schreibt den Token nach `localStorage` und
-liest ihn beim Start wieder ein — mit einem `GET /auth/me`, um zu prüfen, ob er noch gilt.
+`AuthContext` hält `user` und `token`, schreibt den Token nach `localStorage` und liest ihn
+beim Start wieder ein — mit einem `GET /auth/me`, um zu prüfen, ob er noch gilt.
 `ProtectedRoute` leitet ohne gültigen Benutzer auf `/login` um.
 
 Die Rolle darf benutzt werden, um den Löschen-Button auszublenden. Das ist Bedienkomfort,
@@ -133,53 +136,60 @@ Zwei Dependencies stehen zur Verfügung, sobald der Login steht:
 ```python
 # nur angemeldet
 @router.get("/patienten")
-def patienten_liste(benutzer: Benutzer = Depends(get_current_user)): ...
+def patienten_liste(user: User = Depends(get_current_user)): ...
 
 # angemeldet und in der erlaubten Rollenmenge
 @router.delete("/patienten/{patient_id}")
 def patient_loeschen(
     patient_id: int,
-    benutzer: Benutzer = Depends(require_rollen(Rolle.ADMIN)),
+    user: User = Depends(require_roles(Role.ADMIN)),
 ): ...
 ```
 
-`require_rollen` prüft gegen eine **Menge** erlaubter Rollen, nicht gegen eine Rangfolge —
-Begründung in [ADR-0005](./adr/0005-rollen-admin-und-mitarbeiter.md).
+`require_roles` prüft gegen eine **Menge** erlaubter Rollen, nicht gegen eine Rangfolge —
+Begründung in [ADR-0005](./adr/0005-rollen-admin-und-staff.md).
 
-In Sprint 1 benutzt genau ein Endpunkt `require_rollen`: das Löschen eines Patienten. Alle
+In Sprint 1 benutzt genau ein Endpunkt `require_roles`: das Löschen eines Patienten. Alle
 anderen nehmen `get_current_user`.
 
 ## Benutzer-Modell
+
+Tabelle `users` — `user` ist in Postgres ein reserviertes Wort.
 
 | Feld | Typ | Hinweis |
 | ---- | --- | ------- |
 | `id` | int | Primärschlüssel |
 | `email` | str | eindeutig, Login-Kennung |
 | `name` | str | Anzeigename |
-| `passwort_hash` | str | bcrypt, wird **nie** ausgeliefert |
-| `rolle` | str | `admin` oder `mitarbeiter` |
-| `ist_aktiv` | bool | Standard `true`; inaktive Benutzer können sich nicht anmelden |
-| `erstellt_am` | datetime | |
+| `password_hash` | str | bcrypt, wird **nie** ausgeliefert |
+| `role` | str | `admin` oder `staff` |
+| `is_active` | bool | Standard `true`; inaktive Benutzer können sich nicht anmelden |
+| `created_at` | datetime | |
 
 Passwörter werden mit **bcrypt** gehasht (Paket `bcrypt` direkt, nicht `passlib` — passlib
 1.7.4 ist unmaintained und bricht gegen bcrypt 4.x).
 
+Nach außen geht nie das Model `User`, sondern immer `UserPublic` — dieselben Felder ohne
+`password_hash`.
+
 ## Seed-Benutzer
 
-Es gibt keine Selbstregistrierung. Benutzer entstehen über das Seed-Skript:
+Es gibt keine Selbstregistrierung. Benutzer entstehen über das Seed-Skript
+(`python -m app.seed` aus `backend/`):
 
 | E-Mail | Passwort | Rolle |
 | ------ | -------- | ----- |
 | `anna.admin@medidoc.test` | `geheim123` | `admin` |
-| `tom.mitarbeiter@medidoc.test` | `geheim123` | `mitarbeiter` |
+| `tom.staff@medidoc.test` | `geheim123` | `staff` |
 
 Reine Testdaten, wie das ganze Projekt. Für ein Deployment in Sprint 2 müssten sie ersetzt
 werden.
 
 ## Abhängigkeiten
 
-**Von Infra (`.env`):** `JWT_SECRET`, `DATABASE_URL`. Ein `.env.example` liegt im Repo, die
-echte `.env` ist in `.gitignore`.
+**Von Infra:** Die `.env` im Repo-Wurzelverzeichnis — dieselbe Datei, aus der Docker
+Compose die `POSTGRES_*`-Variablen liest. Das Backend baut seine Verbindung aus denselben
+Variablen zusammen und braucht zusätzlich `JWT_SECRET` und die `SEED_*`-Zugangsdaten.
 
 **Zum Backend-Strang:** Die Auth-Arbeit legt `engine`, `get_session` und die SQLModel-Basis
 in `backend/app/db.py` an, weil der Login sie zuerst braucht. Diese Datei gehört danach

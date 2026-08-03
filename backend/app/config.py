@@ -24,9 +24,9 @@ class Settings(BaseSettings):
 
     # Startbenutzer für den Seed. Feste Testzugangsdaten, kein Deployment-Stand.
     seed_admin_email: str
-    seed_admin_passwort: str
-    seed_mitarbeiter_email: str
-    seed_mitarbeiter_passwort: str
+    seed_admin_password: str
+    seed_staff_email: str
+    seed_staff_password: str
 
     cors_origins: str = "http://localhost:5173"
 
