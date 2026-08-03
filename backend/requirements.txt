@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+psycopg[binary]
+pydantic-settings
+
+# Auth
+pyjwt
+bcrypt>=4.0
+python-multipart
