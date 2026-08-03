@@ -1,6 +1,6 @@
 # Projekttagebuch
 
-Täglicher Kurzstand pro Person. Neueste Einträge oben.
+Täglicher Stand pro Person. Neueste Einträge oben.
 
 | Datum | Person | Ergebnisse |
 | ----- | ------ | ---------- |
