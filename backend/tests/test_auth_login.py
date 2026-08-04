@@ -117,5 +117,11 @@ def test_token_ist_mit_falschem_secret_nicht_zu_lesen(client: TestClient, make_u
 
     token = login(client, "anna.admin@medidoc.test", "geheim123").json()["access_token"]
 
+    # Das falsche Secret ist absichtlich lang genug: Ein kurzes loest eine
+    # InsecureKeyLengthWarning aus und macht jeden Lauf unnoetig gelb.
     with pytest.raises(jwt.InvalidSignatureError):
-        jwt.decode(token, "ein-anderes-secret", algorithms=[settings.jwt_algorithm])
+        jwt.decode(
+            token,
+            "ein-anderes-secret-mit-mindestens-32-zeichen",
+            algorithms=[settings.jwt_algorithm],
+        )

@@ -10,6 +10,9 @@ bcrypt>=4.0
 python-multipart
 
 # Tests. Laufen gegen SQLite im Speicher, brauchen also keine eigene Datenbank.
-# httpx2 statt httpx: Starlettes TestClient warnt sonst bei jedem Lauf.
+# httpx2 statt httpx: Starlettes TestClient warnt sonst bei jedem Lauf. Es ist
+# die Nachfolgelinie von httpx (github.com/pydantic/httpx2), kein fremder Fork.
+# Als einzige Abhängigkeit hier auf die Major-Version gepinnt, weil der Name
+# sonst zur Verwechslung einlädt.
 pytest
-httpx2
+httpx2>=2,<3

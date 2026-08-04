@@ -3,18 +3,17 @@
 Die Endpunkte übersetzen nur: Eingabe prüfen, `service` aufrufen, Ergebnis in
 Statuscode und Response-Model gießen. Fachliche Logik gehört nach `service.py`.
 
-Alle Endpunkte verlangen einen angemeldeten Benutzer:
+Alle Endpunkte verlangen einen angemeldeten Benutzer. Die Prüfung hängt am
+Router, nicht an den einzelnen Funktionen:
 
-    from fastapi import Depends
-    from app.modules.auth.dependencies import get_current_user, require_roles
-    from app.modules.users.models import Role, User
+    router = APIRouter(..., dependencies=[Depends(get_current_user)])
 
-    def list_patients(..., user: User = Depends(get_current_user)): ...
-    def delete_patient(..., user: User = Depends(require_roles(Role.ADMIN))): ...
+Damit ist ein neuer Endpunkt automatisch geschützt. Hinge die Dependency an
+jeder Funktion einzeln, wäre ein vergessener Parameter ein still ungeschützter
+Endpunkt — der Fehler soll in die sichere Richtung fallen.
 
-`require_roles(Role.ADMIN)` bekommt genau `DELETE` — die einzige Stelle im
-Sprint 1, die eine Rolle prüft (ADR-0005). Alle anderen nutzen
-`get_current_user`.
+`require_roles(Role.ADMIN)` kommt zusätzlich an genau `DELETE` — die einzige
+Stelle im Sprint 1, die eine Rolle prüft (ADR-0005).
 
 **Offen fürs Daily:** Der Pfad heißt hier `/patients`, weil CONTEXT.md und
 ADR-0005 festlegen, dass Code und API durchgehend englisch sind. In den
@@ -39,17 +38,19 @@ from app.modules.patients.schemas import (
 )
 from app.modules.users.models import Role, User
 
-router = APIRouter(prefix="/patients", tags=["patients"])
+router = APIRouter(
+    prefix="/patients",
+    tags=["patients"],
+    dependencies=[Depends(get_current_user)],
+)
 
 SessionDep = Annotated[Session, Depends(get_session)]
-CurrentUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(require_roles(Role.ADMIN))]
 
 
 @router.get("", response_model=PatientPage)
 def list_patients(
     session: SessionDep,
-    user: CurrentUser,
     q: Annotated[
         str | None,
         Query(description="Sucht in Vorname, Nachname und Versichertennummer"),
@@ -63,23 +64,21 @@ def list_patients(
 
 
 @router.post("", response_model=PatientPublic, status_code=status.HTTP_201_CREATED)
-def create_patient(
-    session: SessionDep, user: CurrentUser, data: PatientCreate
-) -> Patient:
+def create_patient(session: SessionDep, data: PatientCreate) -> Patient:
     """Legt einen Patienten an."""
     _reject_taken_insurance_number(session, data.insurance_number)
     return service.create(session, data)
 
 
 @router.get("/{patient_id}", response_model=PatientPublic)
-def get_patient(session: SessionDep, user: CurrentUser, patient_id: int) -> Patient:
+def get_patient(session: SessionDep, patient_id: int) -> Patient:
     """Die Stammdaten eines Patienten."""
     return _get_or_404(session, patient_id)
 
 
 @router.patch("/{patient_id}", response_model=PatientPublic)
 def update_patient(
-    session: SessionDep, user: CurrentUser, patient_id: int, data: PatientUpdate
+    session: SessionDep, patient_id: int, data: PatientUpdate
 ) -> Patient:
     """Ändert einzelne Stammdaten. Weggelassene Felder bleiben unverändert."""
     patient = _get_or_404(session, patient_id)
@@ -88,7 +87,7 @@ def update_patient(
 
 
 @router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_patient(session: SessionDep, user: AdminUser, patient_id: int) -> None:
+def delete_patient(session: SessionDep, _user: AdminUser, patient_id: int) -> None:
     """Löscht einen Patienten endgültig — nur als `admin`."""
     service.delete(session, _get_or_404(session, patient_id))
 
