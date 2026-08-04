@@ -8,7 +8,26 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.core.security import create_access_token
+from app.main import app
 from app.modules.users.models import Role
+
+
+def patient_routes() -> list[tuple[str, str]]:
+    """Jede registrierte `/patients`-Route als (Methode, Pfad).
+
+    Bewusst aus der App gelesen statt von Hand gepflegt: Ein neuer Endpunkt
+    landet damit automatisch im Test unten und muss sich absichern.
+
+    Quelle ist das OpenAPI-Schema und nicht `app.routes` — eingebundene Router
+    hängen dort inzwischen hinter einem Wrapper, `app.routes` wäre also still
+    leer und der Test würde zu einem übersprungenen Testfall verpuffen.
+    """
+    return [
+        (method.upper(), path)
+        for path, operations in sorted(app.openapi()["paths"].items())
+        if path.startswith("/patients")
+        for method in sorted(operations)
+    ]
 
 
 def test_auth_me_liefert_den_angemeldeten_benutzer(
@@ -95,30 +114,46 @@ def test_auth_me_lehnt_inzwischen_deaktivierten_benutzer_ab(
     assert response.status_code == 401
 
 
-@pytest.mark.parametrize(
-    ("method", "url", "body"),
-    [
-        ("GET", "/patients", None),
-        (
-            "POST",
-            "/patients",
-            {
-                "first_name": "Max",
-                "last_name": "Mustermann",
-                "date_of_birth": "1980-01-01",
-            },
-        ),
-        ("GET", "/patients/1", None),
-        ("PATCH", "/patients/1", {"city": "Hamburg"}),
-        ("DELETE", "/patients/1", None),
-    ],
-)
+def test_die_routenliste_ist_nicht_leer():
+    """Wächter für den Test darunter.
+
+    Eine leere `parametrize`-Liste ist für pytest kein Fehler, sondern ein
+    übersprungener Testfall — die Absicherung wäre dann ungeprüft, ohne dass
+    der Lauf rot wird. Genau das ist beim Schreiben einmal passiert.
+    """
+    assert len(patient_routes()) == 5
+
+
+@pytest.mark.parametrize(("method", "path"), patient_routes())
 def test_alle_patienten_endpunkte_verlangen_einen_token(
-    client: TestClient, method: str, url: str, body: dict | None
+    client: TestClient, method: str, path: str
 ):
-    response = client.request(method, url, json=body)
+    """Ohne Token gibt es keine Patientendaten — für jede Route der App.
+
+    Die Absicherung hängt am Router (`dependencies=[...]`), greift also auch
+    ohne Zutun bei einem neu dazukommenden Endpunkt. Der Request geht bewusst
+    ohne Body raus: Die Token-Prüfung läuft vor der Body-Validierung, `401`
+    muss also auch ohne gültige Nutzdaten kommen.
+    """
+    response = client.request(method, path.replace("{patient_id}", "1"))
 
     assert response.status_code == 401
+
+
+def test_login_bleibt_ohne_token_erreichbar(client: TestClient, make_user):
+    """Das vierte Akzeptanzkriterium aus Issue #15.
+
+    Klingt selbstverständlich, ist aber genau der Fehler, den eine zu breit
+    gesetzte Absicherung macht — und er sperrt alle aus.
+    """
+    make_user(email="anna.admin@medidoc.test", password="geheim123")
+
+    response = client.post(
+        "/auth/login",
+        data={"username": "anna.admin@medidoc.test", "password": "geheim123"},
+    )
+
+    assert response.status_code == 200
 
 
 def test_patient_loeschen_prueft_die_aktuelle_rolle_aus_der_datenbank(

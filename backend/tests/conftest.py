@@ -20,6 +20,7 @@ import app.db.base  # noqa: F401
 from app.core.security import create_access_token, hash_password
 from app.db.session import get_session
 from app.main import app
+from app.modules.users import service as users_service
 from app.modules.users.models import Role, User
 
 
@@ -61,7 +62,9 @@ def make_user_fixture(session: Session):
         is_active: bool = True,
     ) -> User:
         user = User(
-            email=email,
+            # Wie `seed.py` schreiben, sonst fände `get_by_email` einen mit
+            # Großbuchstaben angelegten Testbenutzer nicht wieder.
+            email=users_service.normalize_email(email),
             name=name,
             password_hash=hash_password(password),
             role=role,
