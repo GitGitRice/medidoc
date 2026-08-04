@@ -42,6 +42,18 @@ Ein Issue = ein Branch = ein Pull Request nach `develop`, den ein anderes Teammi
 anschaut. Kein direkter Push auf `main` oder `develop`. `release/*` und `hotfix/*`
 benutzen wir bewusst nicht.
 
+## Tests
+
+Backend und Frontend haben je eine eigene Suite. Beide laufen ohne Docker und ohne
+Datenbank — das Backend gegen SQLite im Speicher, das Frontend gegen jsdom.
+[GitHub Actions](./.github/workflows/ci.yml) startet sie bei jedem Push und jedem
+Pull Request.
+
+```bash
+cd backend  && pytest -q
+cd frontend && npm test
+```
+
 ## Scope
 
 **Im Scope:** Authentifizierung, Patientenverwaltung (anlegen, suchen, bearbeiten,
