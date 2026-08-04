@@ -70,6 +70,16 @@ einen Benutzer mit Klartext-Passwort an.
 Eine `.env` im Repo-Wurzelverzeichnis muss vorhanden sein: `app.core.config` liest sie
 beim Import, auch im Test.
 
+| Datei | Deckt ab |
+| ----- | -------- |
+| [tests/test_auth_login.py](tests/test_auth_login.py) | Anmeldung, Token, Fehlermeldungen |
+| [tests/test_auth_authorization.py](tests/test_auth_authorization.py) | Token-Prüfung und Rollen, für **alle** Patienten-Routen auf einmal |
+| [tests/test_patients_api.py](tests/test_patients_api.py) | Patienten-Endpunkte, gegliedert nach Endpunkt |
+
+Was sich gegen SQLite **nicht** prüfen lässt, steht als Kommentar im jeweiligen Testkopf.
+Der wichtigste Fall: SQLite ignoriert die Groß-/Kleinschreibung nur bei ASCII-Zeichen, die
+Umlaut-Fälle der Patientensuche sind also nur gegen Postgres aussagekräftig.
+
 ## Aufbau
 
 Geschnitten nach **Feature**, nicht nach technischer Schicht. Alles zu einem Thema liegt
@@ -89,6 +99,7 @@ backend/
     ├── api/router.py    hängt die Modul-Router ein — eine Zeile pro Modul
     ├── core/            fachlich neutral, gehört allen
     │   ├── config.py    Einstellungen aus der .env im Repo-Wurzelverzeichnis
+    │   ├── errors.py    ein Format für alle Fehlerantworten
     │   └── security.py  Passwort-Hashing (bcrypt) und Token ausstellen (JWT)
     ├── db/              fachlich neutral, gehört allen
     │   ├── session.py   engine, get_session
@@ -113,6 +124,25 @@ Die eine Regel, die den Rest trägt: **`service.py` kennt kein HTTP.** Keine
 `HTTPException`, keine Statuscodes, keine `Depends`. Der Router übersetzt zwischen beidem.
 Dadurch bleibt die Logik einzeln testbar und der Router kurz genug, um ihn am Stück zu
 lesen.
+
+### Fehlerantworten
+
+Jede Fehlerantwort der API hat dieselbe Form, egal aus welchem Modul sie kommt:
+
+```json
+{ "status": 404, "message": "Patient mit der ID 42 wurde nicht gefunden" }
+```
+
+Zuständig ist [app/core/errors.py](app/core/errors.py) mit zwei Exception-Handlern, die in
+`main.py` registriert werden. Ein Router wirft weiterhin ganz normal `HTTPException` — die
+Form entsteht zentral, nicht an jedem Endpunkt.
+
+Bei `422` kommt `errors` dazu, ein Eintrag pro beanstandetem Feld. `detail` bleibt
+zusätzlich erhalten, damit bestehender Frontend-Code nicht bricht; neuer Code liest
+`message`.
+
+Welcher Endpunkt womit antworten kann, steht als `responses=` an der Endpunkt-Funktion und
+landet damit in `/docs`.
 
 ### Wer fasst was an
 
@@ -163,20 +193,22 @@ Zwei Dinge, die beim Lesen sonst überraschen:
 Der vollständige Vertrag steht in **[docs/patients-api.md](../docs/patients-api.md)** —
 Felder, Beispielantworten, Fehlerfälle, Hinweise fürs Frontend. Hier nur der Überblick:
 
-| Methode | Pfad | Zweck |
-| ------- | ---- | ----- |
-| `GET` | `/patients?q=&limit=&offset=` | Patientenübersicht, durchsuchbar und seitenweise |
-| `POST` | `/patients` | anlegen → `201` |
-| `GET` | `/patients/{id}` | Stammdaten |
-| `PATCH` | `/patients/{id}` | einzelne Felder ändern |
-| `DELETE` | `/patients/{id}` | endgültig löschen → `204` |
+| Methode | Pfad | Zweck | Verlangt |
+| ------- | ---- | ----- | -------- |
+| `GET` | `/patienten?suche=&limit=&offset=` | Patientenübersicht, durchsuchbar und seitenweise | Token |
+| `POST` | `/patienten` | anlegen → `201` | Token |
+| `GET` | `/patienten/{id}` | Stammdaten | Token |
+| `PATCH` | `/patienten/{id}` | einzelne Felder ändern | Token |
+| `DELETE` | `/patienten/{id}` | endgültig löschen → `204` | Token + `admin` |
 
-Zwei Dinge, die beim Lesen des Codes sonst überraschen:
+Drei Dinge, die beim Lesen des Codes sonst überraschen:
 
 - **Nur drei Pflichtfelder** — `first_name`, `last_name`, `date_of_birth`. Ein Patient
   ohne Telefonnummer und ohne Versicherung ist gültig.
-- `GET /patients` liefert `{ items, total, limit, offset }`, keine nackte Liste. `total`
+- `GET /patienten` liefert `{ items, total, limit, offset }`, keine nackte Liste. `total`
   ist die Trefferzahl ohne Paging.
+- **Pfad und Query-Parameter sind deutsch, die JSON-Keys englisch.** Bewusste Mischung,
+  siehe [Namensgebung](../docs/patients-api.md#namensgebung).
 
 Damit die Doku nicht doppelt gepflegt werden muss: Alles Fachliche gehört nach
 `docs/patients-api.md`, hier steht nur, wie der Code aufgebaut ist.
@@ -184,7 +216,7 @@ Damit die Doku nicht doppelt gepflegt werden muss: Alles Fachliche gehört nach
 ## Testdaten
 
 [`testdata/patients.json`](testdata/patients.json) — 200 frei erfundene Patienten, in
-derselben Form wie der Rumpf von `POST /patients`. **Das Frontend kann die Datei direkt
+derselben Form wie der Rumpf von `POST /patienten`. **Das Frontend kann die Datei direkt
 als Mock benutzen**, solange es noch nicht gegen die API baut.
 
 Als JSON neben dem Code und nicht als Python-Literal darin: So kommt das Frontend an
@@ -201,11 +233,10 @@ kaputter Eintrag fällt damit sofort auf und nicht erst, wenn das Frontend ihn a
 
 ## Offene Punkte
 
-- **`/patients` oder `/patienten`?** CONTEXT.md und ADR-0005 legen fest, dass die API
-  durchgehend englisch ist; die Beispiele in docs/auth-api.md schrieben dagegen
-  `/patienten` und sind auf `/patients` gezogen worden. ADR-0005 nennt als angenommene
-  Entscheidung weiterhin `/patienten` und wird nicht nachträglich geändert —
-  **einmal im Daily bestätigen.**
+- **Deutscher Pfad, englische JSON-Keys.** `/patienten` und `?suche=` stehen so im Code und
+  decken sich mit ADR-0005; die Regel in CONTEXT.md („API durchgehend englisch") tut das
+  nicht. Der Stand ist umgesetzt und dokumentiert, die Regel selbst gehört
+  **einmal im Daily nachgezogen** — entweder CONTEXT.md anpassen oder die Pfade zurückziehen.
 - **Keine Migrationen.** `create_all` legt nur fehlende Tabellen an. Für Sprint 1
   bewusst so, siehe oben.
 
