@@ -78,6 +78,7 @@ _Folgt, sobald das Setup steht._
 
 ```
 backend/            FastAPI-API, nach Features geschnitten — siehe backend/README.md
+backend/tests/      pytest gegen SQLite im Speicher, braucht kein Docker
 backend/testdata/   200 erfundene Testpatienten als JSON, auch als Frontend-Mock nutzbar
 frontend/           React (Vite)
 docs/               ADRs, Sprint-Plan, API-Verträge

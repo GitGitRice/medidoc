@@ -4,11 +4,11 @@ Jedes andere Modul schützt seine Endpunkte über genau diese zwei Dependencies
 und schreibt keine eigene Token-Prüfung.
 
     # nur angemeldet
-    @router.get("/patients")
+    @router.get("/patienten")
     def list_patients(user: User = Depends(get_current_user)): ...
 
     # angemeldet und in der erlaubten Rollenmenge
-    @router.delete("/patients/{patient_id}")
+    @router.delete("/patienten/{patient_id}")
     def delete_patient(user: User = Depends(require_roles(Role.ADMIN))): ...
 
 Geprüft wird mengenbasiert, nicht als Rangfolge — Begründung in ADR-0005.

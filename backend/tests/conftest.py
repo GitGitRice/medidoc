@@ -9,6 +9,7 @@ Die App bekommt die Test-Session über `dependency_overrides` untergeschoben —
 """
 
 from collections.abc import Generator
+from datetime import date
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,6 +21,7 @@ import app.db.base  # noqa: F401
 from app.core.security import create_access_token, hash_password
 from app.db.session import get_session
 from app.main import app
+from app.modules.patients.models import Patient
 from app.modules.users import service as users_service
 from app.modules.users.models import Role, User
 
@@ -87,3 +89,55 @@ def auth_headers_fixture():
         return {"Authorization": f"Bearer {token}"}
 
     return _auth_headers
+
+
+@pytest.fixture(name="admin_headers")
+def admin_headers_fixture(make_user, auth_headers) -> dict[str, str]:
+    """Fertiger Header für die Tests, in denen die Rolle nicht das Thema ist.
+
+    `admin`, weil das die Rolle ist, die alle Endpunkte erreicht. Wo die Rolle
+    selbst geprüft wird, steht `staff_headers` daneben.
+    """
+    return auth_headers(make_user(email="anna.admin@medidoc.test", role=Role.ADMIN))
+
+
+@pytest.fixture(name="staff_headers")
+def staff_headers_fixture(make_user, auth_headers) -> dict[str, str]:
+    """Fertiger Header für einen Benutzer ohne Löschrecht."""
+    return auth_headers(
+        make_user(
+            email="tom.staff@medidoc.test",
+            name="Tom Staff",
+            role=Role.STAFF,
+        )
+    )
+
+
+@pytest.fixture(name="make_patient")
+def make_patient_fixture(session: Session):
+    """Legt einen Patienten direkt in der Datenbank an.
+
+    Bewusst an der API vorbei: Ein Test, der seinen Ausgangszustand über
+    `POST /patienten` herstellt, prüft nebenbei immer auch das Anlegen mit —
+    und wird rot, wenn dort etwas kaputtgeht, obwohl er von etwas anderem
+    handelt.
+    """
+
+    def _make_patient(
+        first_name: str = "Max",
+        last_name: str = "Mustermann",
+        date_of_birth: date = date(1978, 3, 14),
+        **felder: object,
+    ) -> Patient:
+        patient = Patient(
+            first_name=first_name,
+            last_name=last_name,
+            date_of_birth=date_of_birth,
+            **felder,
+        )
+        session.add(patient)
+        session.commit()
+        session.refresh(patient)
+        return patient
+
+    return _make_patient

@@ -58,7 +58,11 @@ braucht.
 **Response `401`** — falsche E-Mail *oder* falsches Passwort, bewusst nicht unterscheidbar:
 
 ```json
-{ "detail": "E-Mail oder Passwort ist falsch" }
+{
+  "status": 401,
+  "message": "E-Mail oder Passwort ist falsch",
+  "detail": "E-Mail oder Passwort ist falsch"
+}
 ```
 
 ## GET /auth/me
@@ -96,6 +100,24 @@ Diese Unterscheidung ist für das Frontend wichtig:
 | `403` | angemeldet, aber Rolle reicht nicht | Meldung "Dazu fehlt dir die Berechtigung", **kein** Logout |
 
 Ein `401` wegen abgelaufenem Token ist der Normalfall nach acht Stunden, kein Fehler.
+
+## Die Form der Fehlerantworten
+
+Seit dem 2026-08-04 haben **alle** Fehlerantworten der API dieselbe Form — auch die des
+Logins:
+
+```json
+{ "status": 401, "message": "Anmeldung erforderlich" }
+```
+
+`message` ist deutsch und kann direkt angezeigt werden, `status` wiederholt den
+HTTP-Status im Rumpf. Bei `422` kommt `errors` dazu, ein Eintrag je beanstandetem Feld.
+Die vollständige Beschreibung steht in [patients-api.md](./patients-api.md#fehler), das
+Format selbst in `backend/app/core/errors.py`.
+
+`detail` bleibt zusätzlich erhalten, in genau der Form, die FastAPI ohne unser Zutun
+erzeugt hätte — bestehender Frontend-Code bricht dadurch nicht. **Neuer Code liest
+`message`.**
 
 ## Der Token
 
@@ -135,11 +157,11 @@ Zwei Dependencies stehen zur Verfügung, sobald der Login steht:
 
 ```python
 # nur angemeldet
-@router.get("/patients")
+@router.get("/patienten")
 def list_patients(user: User = Depends(get_current_user)): ...
 
 # angemeldet und in der erlaubten Rollenmenge
-@router.delete("/patients/{patient_id}")
+@router.delete("/patienten/{patient_id}")
 def delete_patient(
     patient_id: int,
     user: User = Depends(require_roles(Role.ADMIN)),

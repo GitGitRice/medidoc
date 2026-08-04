@@ -1,7 +1,7 @@
 """Einstiegspunkt der API.
 
-Bewusst kurz: CORS, `/health`, Router einhängen. Endpunkte stehen in den
-Modulen unter `app/modules/`, nicht hier.
+Bewusst kurz: CORS, Fehlerformat, `/health`, Router einhängen. Endpunkte stehen
+in den Modulen unter `app/modules/`, nicht hier.
 """
 
 from fastapi import FastAPI
@@ -9,8 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.errors import register_error_handlers
 
 app = FastAPI(title="MediDoc API")
+
+# Ein Format für alle Fehlerantworten, siehe app/core/errors.py. Muss vor dem
+# Einhängen der Router nicht stehen, gehört aber der Lesbarkeit halber hierhin.
+register_error_handlers(app)
 
 # Bearer token in the Authorization header, so no credentialed requests.
 app.add_middleware(
