@@ -11,6 +11,11 @@ FastAPI + SQLModel gegen PostgreSQL.
 
 > **Sprache:** Code und API sind englisch, deutsch ist nur die Oberfläche im Frontend.
 > Kommentare und Doku sind deutsch, Bezeichner und JSON-Keys englisch.
+>
+> Ausgenommen sind **Testnamen**: `test_falsches_passwort_liefert_401` und
+> `it("meldet bei 403 nicht ab")` sind Sätze, keine Bezeichner — sie beschreiben
+> das erwartete Verhalten und stehen deshalb wie die Doku auf Deutsch. Das gilt
+> in beiden Suites.
 
 ## Lokal starten
 

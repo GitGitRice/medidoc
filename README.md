@@ -42,6 +42,13 @@ Ein Issue = ein Branch = ein Pull Request nach `develop`, den ein anderes Teammi
 anschaut. Kein direkter Push auf `main` oder `develop`. `release/*` und `hotfix/*`
 benutzen wir bewusst nicht.
 
+**Ausnahme `feature/auth`:** Die Authentifizierung (Issues #13–#17) hängt so eng
+zusammen, dass die einzelnen Branches aufeinander aufbauen statt nebeneinander zu
+laufen. Sie gehen deshalb als Pull Request nach `feature/auth`; dieser Branch geht
+am Ende als ein Pull Request nach `develop`. Ein Pull Request gegen `feature/auth`
+ist also kein falsches Ziel. Für alles außerhalb der Auth-Strecke bleibt es bei
+`develop` als Ziel.
+
 ## Tests
 
 Backend und Frontend haben je eine eigene Suite. Beide laufen ohne Docker und ohne

@@ -102,4 +102,41 @@ describe("Sitzung beim Laden", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(getCurrentUser).not.toHaveBeenCalled();
   });
+
+  // Ein Token ist erst widerlegt, wenn das Backend ihn mit 401 ablehnt. Alles
+  // andere ist eine Störung und darf die Sitzung nicht kosten — docs/auth-api.md.
+  it.each([
+    ["ein nicht erreichbares Backend", new ApiError("Das Backend ist nicht erreichbar.", 0)],
+    ["einen Serverfehler", new ApiError("Die Anfrage ist fehlgeschlagen.", 500)],
+    ["eine kaputte Antwort", new TypeError("body is not valid JSON")],
+  ])("behält den Token bei %s", async (_beschreibung, fehler) => {
+    window.localStorage.setItem(TOKEN_KEY, "stored-token");
+    getCurrentUser.mockRejectedValue(fehler);
+
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(window.localStorage.getItem(TOKEN_KEY)).toBe("stored-token");
+    expect(result.current.token).toBe("stored-token");
+    expect(result.current.sessionError).toBe(fehler);
+    expect(result.current.user).toBeNull();
+  });
+
+  it("stellt die Sitzung beim zweiten Anlauf her", async () => {
+    window.localStorage.setItem(TOKEN_KEY, "stored-token");
+    getCurrentUser.mockRejectedValue(
+      new ApiError("Das Backend ist nicht erreichbar.", 0),
+    );
+
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.sessionError).not.toBeNull());
+
+    getCurrentUser.mockResolvedValue(user);
+    await act(async () => {
+      result.current.retrySession();
+    });
+
+    await waitFor(() => expect(result.current.user).toEqual(user));
+    expect(result.current.sessionError).toBeNull();
+  });
 });
