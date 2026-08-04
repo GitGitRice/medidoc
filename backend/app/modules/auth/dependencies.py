@@ -1,8 +1,7 @@
 """Die Absicherung, die alle anderen Module benutzen.
 
-**Strang C (Steven), noch nicht implementiert.** Das ist die wichtigste Naht im
-Backend: Jedes andere Modul schützt seine Endpunkte über genau diese zwei
-Dependencies und schreibt keine eigene Token-Prüfung.
+Jedes andere Modul schützt seine Endpunkte über genau diese zwei Dependencies
+und schreibt keine eigene Token-Prüfung.
 
     # nur angemeldet
     @router.get("/patients")
@@ -19,42 +18,77 @@ Unterscheidung ist für das Frontend wichtig, siehe docs/auth-api.md.
 Die Rolle wird bei jeder Prüfung aus der Datenbank gelesen und nicht aus dem
 Token übernommen, damit ein noch acht Stunden gültiger Token nach einer
 Rollenänderung keine alten Rechte mitschleppt.
-
-Solange hier `NotImplementedError` steht, laufen die Patienten-Endpunkte
-ungeschützt — bewusst so, siehe docs/sprint-1-plan.md. Sie werden in einem
-Durchgang abgesichert, sobald diese Datei steht. Die Stubs geben absichtlich
-nie einen Benutzer zurück: Ein Fehler ist harmlos, ein versehentlich
-durchgewinkter Request nicht.
 """
 
 from collections.abc import Callable
+from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session
 
+from app.core.security import decode_access_token
 from app.db.session import get_session
+from app.modules.users import service as users_service
 from app.modules.users.models import Role, User
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
-def get_current_user(session: Session = Depends(get_session)) -> User:
+UNAUTHORIZED_DETAIL = "Anmeldung erforderlich"
+
+
+def _unauthorized() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=UNAUTHORIZED_DETAIL,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def get_current_user(
+    token: Annotated[str | None, Depends(oauth2_scheme)],
+    session: Session = Depends(get_session),
+) -> User:
     """Der angemeldete Benutzer zum `Authorization: Bearer <token>`-Header.
 
-    Erwartet: Token dekodieren (`HS256`, Secret aus `settings.jwt_secret`),
-    `sub` als Benutzer-ID lesen, Benutzer über
-    `app.modules.users.service.get_by_id` holen, `401` wenn der Token fehlt,
-    abgelaufen oder ungültig ist oder der Benutzer nicht `is_active` ist.
+    Dekodiert den Token, liest `sub` als Benutzer-ID und holt den Benutzer über
+    `app.modules.users.service.get_by_id`. Antwortet mit `401`, wenn der Token
+    fehlt, abgelaufen oder ungültig ist oder der Benutzer nicht `is_active` ist.
     """
-    raise NotImplementedError("Auth steht noch aus — siehe docs/auth-api.md")
+    if token is None:
+        raise _unauthorized()
+
+    payload = decode_access_token(token)
+    if payload is None:
+        raise _unauthorized()
+
+    try:
+        user_id = int(payload["sub"])
+    except (KeyError, TypeError, ValueError):
+        raise _unauthorized() from None
+
+    user = users_service.get_by_id(session, user_id)
+    if user is None or not user.is_active:
+        raise _unauthorized()
+
+    return user
 
 
 def require_roles(*allowed_roles: Role) -> Callable[..., User]:
     """Baut eine Dependency, die zusätzlich die Rolle prüft.
 
-    Erwartet: `get_current_user` aufrufen, dann `403`, wenn die Rolle des
-    Benutzers nicht in `allowed_roles` liegt.
+    Ruft `get_current_user` auf und antwortet mit `403`, wenn die Rolle des
+    Benutzers nicht in der erlaubten Menge liegt.
     """
 
+    allowed = frozenset(allowed_roles)
+
     def dependency(user: User = Depends(get_current_user)) -> User:
-        raise NotImplementedError("Auth steht noch aus — siehe docs/auth-api.md")
+        if user.role not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Dazu fehlt dir die Berechtigung",
+            )
+        return user
 
     return dependency

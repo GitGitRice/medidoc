@@ -27,6 +27,21 @@ in der Befunde, Arztbriefe und Laborwerte abgelegt werden.
   — Begründung in [ADR-0002](./docs/adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)
 - **Infrastruktur:** Docker Compose
 
+## Arbeitsweise
+
+Wir arbeiten nach **Gitflow** — Begründung und Details in
+[ADR-0006](./docs/adr/0006-gitflow-als-branching-modell.md).
+
+| Branch | Bedeutung |
+| ------ | --------- |
+| `main` | Der vorführbare Stand. Nur Merges aus `develop`. |
+| `develop` | Integration aller Stränge. Nur Merges aus `feature/*`. |
+| `feature/<issue>-<kurzname>` | Ein Issue, ein Branch — z. B. `feature/14-auth-login` |
+
+Ein Issue = ein Branch = ein Pull Request nach `develop`, den ein anderes Teammitglied
+anschaut. Kein direkter Push auf `main` oder `develop`. `release/*` und `hotfix/*`
+benutzen wir bewusst nicht.
+
 ## Scope
 
 **Im Scope:** Authentifizierung, Patientenverwaltung (anlegen, suchen, bearbeiten,

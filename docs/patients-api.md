@@ -260,22 +260,17 @@ das Formular die Meldung an der richtigen Stelle anzeigen kann:
 }
 ```
 
-## Absicherung — kommt noch
+## Absicherung
 
-Die Endpunkte sind **im Moment ohne Token erreichbar**. Das ist Absicht und im
-[Sprint-1-Plan](./sprint-1-plan.md) so vorgesehen, damit Frontend und Backend nicht auf
-den Login warten.
-
-Sobald `get_current_user` und `require_roles` stehen, gilt:
+Mit `get_current_user` und `require_roles` gilt:
 
 | Endpunkt | Verlangt |
 | -------- | -------- |
 | `GET`, `POST`, `PATCH` auf `/patients` | gültigen Token |
 | `DELETE /patients/{id}` | gültigen Token **und** Rolle `admin` |
 
-Das ist die einzige Stelle im Sprint 1, die eine Rolle prüft. Für das Frontend ändert sich
-dann: `401` → Token verwerfen und zur Login-Seite, `403` → Meldung anzeigen, **kein**
-Logout.
+Das ist die einzige Stelle im Sprint 1, die eine Rolle prüft. Für das Frontend gilt:
+`401` → Token verwerfen und zur Login-Seite, `403` → Meldung anzeigen, **kein** Logout.
 
 Der Löschen-Button darf für `staff` ausgeblendet werden. Das ist Bedienkomfort, keine
 Absicherung — durchgesetzt wird im Backend.
@@ -298,8 +293,8 @@ await fetch(`${base}/patients/${id}`, {
 });
 ```
 
-Sobald Auth steht, kommt an jeden Request der `Authorization`-Header mit dem Bearer-Token
-dazu, genau wie in [auth-api.md](./auth-api.md) beschrieben.
+An jeden Request kommt der `Authorization`-Header mit dem Bearer-Token, genau wie in
+[auth-api.md](./auth-api.md) beschrieben.
 
 Leere Suche einfach weglassen: `?q=` und gar kein `q` verhalten sich gleich.
 

@@ -68,14 +68,15 @@ Der Punkt, der erfahrungsgemäß am ehesten wieder aufgemacht wird, ist der
 Ein Issue ist fertig, wenn:
 
 - [ ] die Akzeptanzkriterien im Issue alle erfüllt sind
-- [ ] der Code auf `main` gemerged ist (über Pull Request, nicht direkt gepusht)
+- [ ] der Code auf `develop` gemerged ist (über Pull Request, nicht direkt gepusht)
 - [ ] jemand anderes es einmal lokal ausprobiert hat
 - [ ] `docker compose up` danach weiterhin durchläuft
 
 ## Arbeitsweise
 
-- **Branch pro Issue**, Pull Request nach `main`, ein anderes Teammitglied schaut drauf.
-  Kein direkter Push auf `main`.
+- **Branch pro Issue**, Pull Request nach `develop`, ein anderes Teammitglied schaut
+  drauf. Kein direkter Push auf `main` oder `develop` — Gitflow, siehe
+  [ADR-0006](./adr/0006-gitflow-als-branching-modell.md).
 - **Ein Issue gleichzeitig pro Person** in der Spalte *In Arbeit*. Diese eine Regel
   verhindert vier halbfertige Branches am Freitagmorgen.
 - **Ein Issue = maximal ein Tag.** Was länger dauert, sind zwei Issues. Nur so hat das
