@@ -1,0 +1,49 @@
+/* Bewusst neutral. Produktfarben und endgültiges Layout stehen noch nicht fest. */
+:root {
+  font-family: system-ui, sans-serif;
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  line-height: 1.5;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.page {
+  max-inline-size: 42rem;
+  margin-inline: auto;
+  padding: 1rem;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+form,
+label {
+  display: grid;
+  gap: 0.5rem;
+}
+
+form {
+  max-inline-size: 24rem;
+  gap: 1rem;
+}
+
+input,
+button {
+  padding: 0.5rem;
+}
+
+.error {
+  border-inline-start: 0.25rem solid currentColor;
+  padding-inline-start: 0.75rem;
+}

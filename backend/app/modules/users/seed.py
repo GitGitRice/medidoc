@@ -27,7 +27,8 @@ def seed_users(session: Session) -> None:
 
         session.add(
             User(
-                email=email,
+                # Die Schreibseite der Regel aus service.normalize_email.
+                email=service.normalize_email(email),
                 name=name,
                 password_hash=hash_password(password),
                 role=role,

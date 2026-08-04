@@ -3,19 +3,17 @@
 Die Endpunkte übersetzen nur: Eingabe prüfen, `service` aufrufen, Ergebnis in
 Statuscode und Response-Model gießen. Fachliche Logik gehört nach `service.py`.
 
-**Noch ungeschützt.** So im Sprint-1-Plan vorgesehen, damit Frontend und
-Backend nicht auf den Login warten. Sobald `app/modules/auth/dependencies.py`
-steht, kommt an jeden Endpunkt eine Zeile:
+Alle Endpunkte verlangen einen angemeldeten Benutzer. Die Prüfung hängt am
+Router, nicht an den einzelnen Funktionen:
 
-    from fastapi import Depends
-    from app.modules.auth.dependencies import get_current_user, require_roles
-    from app.modules.users.models import Role, User
+    router = APIRouter(..., dependencies=[Depends(get_current_user)])
 
-    def list_patients(..., user: User = Depends(get_current_user)): ...
-    def delete_patient(..., user: User = Depends(require_roles(Role.ADMIN))): ...
+Damit ist ein neuer Endpunkt automatisch geschützt. Hinge die Dependency an
+jeder Funktion einzeln, wäre ein vergessener Parameter ein still ungeschützter
+Endpunkt — der Fehler soll in die sichere Richtung fallen.
 
-`require_roles(Role.ADMIN)` bekommt genau `DELETE` — die einzige Stelle im
-Sprint 1, die eine Rolle prüft (ADR-0005). Alle anderen `get_current_user`.
+`require_roles(Role.ADMIN)` kommt zusätzlich an genau `DELETE` — die einzige
+Stelle im Sprint 1, die eine Rolle prüft (ADR-0005).
 
 **Offen fürs Daily:** Der Pfad heißt hier `/patients`, weil CONTEXT.md und
 ADR-0005 festlegen, dass Code und API durchgehend englisch sind. In den
@@ -29,6 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session
 
 from app.db.session import get_session
+from app.modules.auth.dependencies import get_current_user, require_roles
 from app.modules.patients import service
 from app.modules.patients.models import Patient
 from app.modules.patients.schemas import (
@@ -37,10 +36,16 @@ from app.modules.patients.schemas import (
     PatientPublic,
     PatientUpdate,
 )
+from app.modules.users.models import Role, User
 
-router = APIRouter(prefix="/patients", tags=["patients"])
+router = APIRouter(
+    prefix="/patients",
+    tags=["patients"],
+    dependencies=[Depends(get_current_user)],
+)
 
 SessionDep = Annotated[Session, Depends(get_session)]
+AdminUser = Annotated[User, Depends(require_roles(Role.ADMIN))]
 
 
 @router.get("", response_model=PatientPage)
@@ -82,11 +87,8 @@ def update_patient(
 
 
 @router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_patient(session: SessionDep, patient_id: int) -> None:
-    """Löscht einen Patienten endgültig.
-
-    Verlangt später `admin` — siehe Hinweis oben im Modul.
-    """
+def delete_patient(session: SessionDep, _user: AdminUser, patient_id: int) -> None:
+    """Löscht einen Patienten endgültig — nur als `admin`."""
     service.delete(session, _get_or_404(session, patient_id))
 
 

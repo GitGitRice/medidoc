@@ -27,6 +27,40 @@ in der Befunde, Arztbriefe und Laborwerte abgelegt werden.
   — Begründung in [ADR-0002](./docs/adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)
 - **Infrastruktur:** Docker Compose
 
+## Arbeitsweise
+
+Wir arbeiten nach **Gitflow** — Begründung und Details in
+[ADR-0006](./docs/adr/0006-gitflow-als-branching-modell.md).
+
+| Branch | Bedeutung |
+| ------ | --------- |
+| `main` | Der vorführbare Stand. Nur Merges aus `develop`. |
+| `develop` | Integration aller Stränge. Nur Merges aus `feature/*`. |
+| `feature/<issue>-<kurzname>` | Ein Issue, ein Branch — z. B. `feature/14-auth-login` |
+
+Ein Issue = ein Branch = ein Pull Request nach `develop`, den ein anderes Teammitglied
+anschaut. Kein direkter Push auf `main` oder `develop`. `release/*` und `hotfix/*`
+benutzen wir bewusst nicht.
+
+**Ausnahme `feature/auth`:** Die Authentifizierung (Issues #13–#17) hängt so eng
+zusammen, dass die einzelnen Branches aufeinander aufbauen statt nebeneinander zu
+laufen. Sie gehen deshalb als Pull Request nach `feature/auth`; dieser Branch geht
+am Ende als ein Pull Request nach `develop`. Ein Pull Request gegen `feature/auth`
+ist also kein falsches Ziel. Für alles außerhalb der Auth-Strecke bleibt es bei
+`develop` als Ziel.
+
+## Tests
+
+Backend und Frontend haben je eine eigene Suite. Beide laufen ohne Docker und ohne
+Datenbank — das Backend gegen SQLite im Speicher, das Frontend gegen jsdom.
+[GitHub Actions](./.github/workflows/ci.yml) startet sie bei jedem Push und jedem
+Pull Request.
+
+```bash
+cd backend  && pytest -q
+cd frontend && npm test
+```
+
 ## Scope
 
 **Im Scope:** Authentifizierung, Patientenverwaltung (anlegen, suchen, bearbeiten,
