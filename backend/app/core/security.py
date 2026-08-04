@@ -49,6 +49,24 @@ def create_access_token(user_id: int, role: str) -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
+def decode_access_token(token: str) -> dict[str, object] | None:
+    """Prüft und dekodiert ein Access-Token, sonst `None`.
+
+    Ungültige Signaturen, abgelaufene Token und eine unpassende Payload sind
+    für die aufrufende Auth-Schicht derselbe Fall: Es gibt keine bestätigte
+    Identität.
+    """
+    try:
+        return jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            options={"require": ["sub", "role", "exp"]},
+        )
+    except jwt.InvalidTokenError:
+        return None
+
+
 def _check_length(password: str) -> None:
     if len(password.encode()) > MAX_PASSWORD_BYTES:
         raise ValueError(

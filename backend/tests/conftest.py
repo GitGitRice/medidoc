@@ -17,7 +17,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 # Nur wegen der Nebenwirkung: registriert alle Tabellen in SQLModel.metadata.
 import app.db.base  # noqa: F401
-from app.core.security import hash_password
+from app.core.security import create_access_token, hash_password
 from app.db.session import get_session
 from app.main import app
 from app.modules.users.models import Role, User
@@ -73,3 +73,14 @@ def make_user_fixture(session: Session):
         return user
 
     return _make_user
+
+
+@pytest.fixture(name="auth_headers")
+def auth_headers_fixture():
+    """Baut den Bearer-Header, den geschützte Endpunkte erwarten."""
+
+    def _auth_headers(user: User) -> dict[str, str]:
+        token = create_access_token(user.id, user.role)
+        return {"Authorization": f"Bearer {token}"}
+
+    return _auth_headers

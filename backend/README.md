@@ -137,7 +137,7 @@ was schon steht:
 | Methode | Pfad | Zweck | Stand |
 | ------- | ---- | ----- | ----- |
 | `POST` | `/auth/login` | E-Mail und Passwort gegen ein JWT tauschen | fertig |
-| `GET` | `/auth/me` | Benutzer zum Token | offen, mit `get_current_user` |
+| `GET` | `/auth/me` | Benutzer zum Token | fertig |
 
 Der Login ist **formular-kodiert**, nicht JSON (`OAuth2PasswordRequestForm`) — nur so
 funktioniert der *Authorize*-Button in `/docs`. Das Feld heißt `username` und enthält die
@@ -196,14 +196,6 @@ kaputter Eintrag fällt damit sofort auf und nicht erst, wenn das Frontend ihn a
 
 ## Offene Punkte
 
-- **Die Patienten-Endpunkte sind noch ungeschützt.** So im
-  [Sprint-1-Plan](../docs/sprint-1-plan.md) vorgesehen, damit Frontend und Backend nicht
-  auf den Login warten. Sobald `modules/auth/dependencies.py` steht, kommt an jeden
-  Endpunkt ein `Depends(get_current_user)` und an `DELETE` ein
-  `Depends(require_roles(Role.ADMIN))` — die einzige Stelle im Sprint 1, die eine Rolle
-  prüft ([ADR-0005](../docs/adr/0005-rollen-admin-und-staff.md)). Die genauen Zeilen
-  stehen oben in [modules/patients/router.py](app/modules/patients/router.py). Die Stubs
-  werfen bis dahin `NotImplementedError` und winken bewusst niemanden durch.
 - **`/patients` oder `/patienten`?** CONTEXT.md und ADR-0005 legen fest, dass die API
   durchgehend englisch ist; die Beispiele in docs/auth-api.md schrieben dagegen
   `/patienten` und sind auf `/patients` gezogen worden. ADR-0005 nennt als angenommene

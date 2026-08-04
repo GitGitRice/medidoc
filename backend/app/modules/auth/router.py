@@ -6,8 +6,7 @@ Der verbindliche Vertrag steht in docs/auth-api.md.
   Feld `username` enthält die E-Mail. Antwort: `TokenResponse`.
   `401` bei falscher E-Mail *oder* falschem Passwort, bewusst nicht
   unterscheidbar.
-- `GET /auth/me` — liefert `UserPublic` zum Token. Steht noch aus und kommt
-  zusammen mit `get_current_user` dazu (Issue #15).
+- `GET /auth/me` — liefert `UserPublic` zum gültigen Bearer-Token.
 
 Der Endpunkt übersetzt nur: Formular entgegennehmen, `service.authenticate`
 fragen, Antwort in Token und Statuscode gießen. Die Prüfung selbst steht in
@@ -23,7 +22,9 @@ from sqlmodel import Session
 from app.core.security import create_access_token
 from app.db.session import get_session
 from app.modules.auth import service
+from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.schemas import TokenResponse
+from app.modules.users.models import User
 from app.modules.users.schemas import UserPublic
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -60,3 +61,9 @@ def login(
         access_token=create_access_token(user.id, user.role),
         user=UserPublic.model_validate(user),
     )
+
+
+@router.get("/me", response_model=UserPublic)
+def me(user: Annotated[User, Depends(get_current_user)]) -> User:
+    """Liefert den zum Bearer-Token gehörenden aktiven Benutzer."""
+    return user
