@@ -26,12 +26,54 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   // Ohne gespeicherten Token gibt es nichts zu prüfen: sofort fertig.
   const [isLoading, setIsLoading] = useState(Boolean(token));
+  // Gesetzt, wenn der Token weder bestätigt noch widerlegt werden konnte.
+  const [sessionError, setSessionError] = useState(null);
 
   const logout = useCallback(() => {
     window.localStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     setUser(null);
+    setSessionError(null);
   }, []);
+
+  /**
+   * Fragt beim Backend nach, wem der Token gehört.
+   *
+   * Der Ausgang entscheidet über den Token, und zwar nach derselben Regel wie in
+   * `apiFetch`: Nur ein `401` heißt "nicht mehr gültig" (docs/auth-api.md). Ein
+   * unerreichbares Backend, ein `500` oder eine kaputte Antwort sagen nichts
+   * über den Token aus — die Sitzung bleibt bestehen und wird als ungeprüft
+   * gemeldet, damit die Oberfläche zum erneuten Versuch einladen kann.
+   */
+  const verifySession = useCallback(
+    (currentToken, signal) => {
+      setIsLoading(true);
+      setSessionError(null);
+
+      return getCurrentUser(currentToken, { signal })
+        .then((currentUser) => {
+          setUser(currentUser);
+          setIsLoading(false);
+        })
+        .catch((error) => {
+          // Abgebrochen heißt: Die Komponente ist weg oder React hat im
+          // StrictMode neu eingehängt. Dann hat dieser Lauf nichts mehr zu
+          // melden — vor allem darf er den Token nicht wegwerfen.
+          if (signal?.aborted) {
+            return;
+          }
+
+          if (error instanceof ApiError && error.status === 401) {
+            logout();
+          } else {
+            setSessionError(error);
+          }
+
+          setIsLoading(false);
+        });
+    },
+    [logout],
+  );
 
   useEffect(() => {
     // Bewusst nur beim ersten Rendern, daher die leere Abhängigkeitsliste:
@@ -44,25 +86,20 @@ export function AuthProvider({ children }) {
 
     const controller = new AbortController();
 
-    getCurrentUser(token, { signal: controller.signal })
-      .then((currentUser) => {
-        setUser(currentUser);
-        setIsLoading(false);
-      })
-      .catch(() => {
-        // Abgebrochen heißt: Die Komponente ist weg oder React hat im
-        // StrictMode neu eingehängt. Dann hat dieser Lauf nichts mehr zu melden
-        // — vor allem darf er den Token nicht wegwerfen.
-        if (controller.signal.aborted) {
-          return;
-        }
-        logout();
-        setIsLoading(false);
-      });
+    verifySession(token, controller.signal);
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Der zweite Anlauf, nachdem die Prüfung an der Verbindung gescheitert ist. */
+  const retrySession = useCallback(() => {
+    if (!token) {
+      return;
+    }
+
+    verifySession(token);
+  }, [token, verifySession]);
 
   const login = useCallback(async (email, password) => {
     const result = await requestLogin(email, password);
@@ -70,6 +107,7 @@ export function AuthProvider({ children }) {
     window.localStorage.setItem(TOKEN_STORAGE_KEY, result.access_token);
     setToken(result.access_token);
     setUser(result.user);
+    setSessionError(null);
 
     return result.user;
   }, []);
@@ -97,8 +135,26 @@ export function AuthProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ apiFetch, isLoading, login, logout, token, user }),
-    [apiFetch, isLoading, login, logout, token, user],
+    () => ({
+      apiFetch,
+      isLoading,
+      login,
+      logout,
+      retrySession,
+      sessionError,
+      token,
+      user,
+    }),
+    [
+      apiFetch,
+      isLoading,
+      login,
+      logout,
+      retrySession,
+      sessionError,
+      token,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

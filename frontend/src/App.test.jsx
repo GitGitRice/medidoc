@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App.jsx";
-import { getCurrentUser, login as requestLogin } from "./api.js";
+import { ApiError, getCurrentUser, login as requestLogin } from "./api.js";
 import { AuthProvider } from "./auth/AuthContext.jsx";
 
 // Nur die Netzwerkfunktionen ersetzen. `ApiError` bleibt die echte Klasse,
@@ -101,6 +101,34 @@ describe("Authentifizierung", () => {
       // den laufenden Request nicht verwaist stehen lässt.
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+  });
+
+  it("wirft die Sitzung nicht weg, wenn das Backend beim Laden schweigt", async () => {
+    window.localStorage.setItem("medidoc.accessToken", "stored-token");
+    getCurrentUser.mockRejectedValue(
+      new ApiError("Das Backend ist nicht erreichbar.", 0),
+    );
+    renderAt("/");
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Sitzung konnte nicht geprüft werden",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Anmelden" }),
+    ).not.toBeInTheDocument();
+    expect(window.localStorage.getItem("medidoc.accessToken")).toBe(
+      "stored-token",
+    );
+
+    // Und der zweite Anlauf führt ohne neue Anmeldung zurück in die Anwendung.
+    getCurrentUser.mockResolvedValue(user);
+    fireEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Angemeldet" }),
+    ).toBeInTheDocument();
   });
 
   it("meldet den Benutzer ab und entfernt den Token", async () => {
