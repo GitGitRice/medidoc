@@ -48,6 +48,23 @@ wegwerfen und neu seeden:
 docker compose down -v && docker compose up -d && docker compose exec fastapi python -m app.seed
 ```
 
+## Tests
+
+```bash
+docker compose exec fastapi pytest
+```
+
+Oder ohne Docker, aus `backend/` und mit installierten Abhängigkeiten: `pytest`.
+
+Die Tests laufen gegen **SQLite im Speicher**, nicht gegen Postgres — sie brauchen keine
+laufende Datenbank und hinterlassen keine Daten. Die Session wird der App über
+`app.dependency_overrides[get_session]` untergeschoben, die echte Engine bleibt
+unangetastet. Fixtures stehen in [tests/conftest.py](tests/conftest.py); `make_user` legt
+einen Benutzer mit Klartext-Passwort an.
+
+Eine `.env` im Repo-Wurzelverzeichnis muss vorhanden sein: `app.core.config` liest sie
+beim Import, auch im Test.
+
 ## Aufbau
 
 Geschnitten nach **Feature**, nicht nach technischer Schicht. Alles zu einem Thema liegt
@@ -57,6 +74,8 @@ ohne in dieselben Dateien zu fassen.
 ```
 backend/
 ├── requirements.txt
+├── pytest.ini
+├── tests/               laufen gegen SQLite im Speicher, ohne Docker
 ├── testdata/
 │   └── patients.json    200 erfundene Patienten
 └── app/
@@ -65,7 +84,7 @@ backend/
     ├── api/router.py    hängt die Modul-Router ein — eine Zeile pro Modul
     ├── core/            fachlich neutral, gehört allen
     │   ├── config.py    Einstellungen aus der .env im Repo-Wurzelverzeichnis
-    │   └── security.py  Passwort-Hashing (bcrypt)
+    │   └── security.py  Passwort-Hashing (bcrypt) und Token ausstellen (JWT)
     ├── db/              fachlich neutral, gehört allen
     │   ├── session.py   engine, get_session
     │   └── base.py      kennt alle Models, legt Tabellen an
@@ -109,6 +128,30 @@ Die Aufteilung ist so gewählt, dass Merge-Konflikte selten sind:
 4. Hat das Modul Tabellen: eine Import-Zeile in [app/db/base.py](app/db/base.py) —
    sonst fehlt die Tabelle beim Anlegen, **ohne dass irgendwo ein Fehler auftaucht**.
 5. Hat es Testdaten: `seed.py` und eine Zeile in [app/seed.py](app/seed.py).
+
+## Auth-API
+
+Der vollständige Vertrag steht in **[docs/auth-api.md](../docs/auth-api.md)**. Hier nur,
+was schon steht:
+
+| Methode | Pfad | Zweck | Stand |
+| ------- | ---- | ----- | ----- |
+| `POST` | `/auth/login` | E-Mail und Passwort gegen ein JWT tauschen | fertig |
+| `GET` | `/auth/me` | Benutzer zum Token | offen, mit `get_current_user` |
+
+Der Login ist **formular-kodiert**, nicht JSON (`OAuth2PasswordRequestForm`) — nur so
+funktioniert der *Authorize*-Button in `/docs`. Das Feld heißt `username` und enthält die
+E-Mail.
+
+Zwei Dinge, die beim Lesen sonst überraschen:
+
+- **`authenticate` gibt bei drei verschiedenen Fehlern dasselbe `None` zurück** —
+  E-Mail unbekannt, Passwort falsch, Benutzer deaktiviert. Der Router kann sie damit
+  nicht unterscheiden, und das `401` verrät nichts. Aus demselben Grund läuft bei einer
+  unbekannten E-Mail trotzdem eine bcrypt-Prüfung gegen einen Dummy-Hash.
+- **E-Mails werden normalisiert gespeichert und normalisiert gesucht**
+  (`users.service.normalize_email`). Ohne diese Regel würden `Anna.Admin@…` und
+  `anna.admin@…` zwei Konten.
 
 ## Patienten-API
 
