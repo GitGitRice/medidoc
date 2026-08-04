@@ -135,12 +135,12 @@ Zwei Dependencies stehen zur Verfügung, sobald der Login steht:
 
 ```python
 # nur angemeldet
-@router.get("/patienten")
-def patienten_liste(user: User = Depends(get_current_user)): ...
+@router.get("/patients")
+def list_patients(user: User = Depends(get_current_user)): ...
 
 # angemeldet und in der erlaubten Rollenmenge
-@router.delete("/patienten/{patient_id}")
-def patient_loeschen(
+@router.delete("/patients/{patient_id}")
+def delete_patient(
     patient_id: int,
     user: User = Depends(require_roles(Role.ADMIN)),
 ): ...
@@ -191,10 +191,15 @@ werden.
 Compose die `POSTGRES_*`-Variablen liest. Das Backend baut seine Verbindung aus denselben
 Variablen zusammen und braucht zusätzlich `JWT_SECRET` und die `SEED_*`-Zugangsdaten.
 
-**Zum Backend-Strang:** Die Auth-Arbeit legt `engine`, `get_session` und die SQLModel-Basis
-in `backend/app/db.py` an, weil der Login sie zuerst braucht. Diese Datei gehört danach
-beiden Strängen — Patienten-Modelle bauen darauf auf, statt eine zweite Session-Verwaltung
-anzulegen.
+**Zum Backend-Strang:** `engine` und `get_session` liegen in
+`backend/app/db/session.py`, die Tabellenanlage in `backend/app/db/base.py`. Beides gehört
+allen Strängen gemeinsam — wer eine Session braucht, nimmt `get_session` und legt keine
+zweite Session-Verwaltung an. Der Aufbau des Backends steht in
+[backend/README.md](../backend/README.md).
+
+Der Login findet seinen Benutzer über `app.modules.users.service` (`get_by_email`,
+`get_by_id`) und muss keine eigenen Queries schreiben. Passwörter prüft
+`app.core.security.verify_password`.
 
 ## Nicht enthalten
 
