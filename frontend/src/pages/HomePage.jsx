@@ -1,4 +1,5 @@
 import { useAuth } from "../auth/AuthContext.jsx";
+import { Overview } from "./Overview.jsx";
 
 export function HomePage() {
   const { user } = useAuth();
@@ -10,7 +11,8 @@ export function HomePage() {
         {user.name} ({user.email})
       </p>
       <p>Rolle: {user.role}</p>
-      <p>Die Patientenübersicht wird in einem eigenen Arbeitsschritt ergänzt.</p>
+
+      <Overview />
     </>
   );
 }

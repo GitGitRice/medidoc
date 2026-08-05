@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiRequest, getCurrentUser, login } from "./api.js";
+import { ApiError, apiRequest, getCurrentUser, login, patientsPath } from "./api.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -45,6 +45,12 @@ describe("login", () => {
     expect(options.body.toString()).toBe(
       "username=anna.admin%40medidoc.test&password=geheim123",
     );
+  });
+});
+
+describe("patientsPath", () => {
+  it("zeigt auf die Patientenübersicht", () => {
+    expect(patientsPath()).toBe("/patienten");
   });
 });
 

@@ -94,3 +94,10 @@ export function login(email, password) {
 export function getCurrentUser(token, options = {}) {
   return apiRequest("/auth/me", { ...options, token });
 }
+
+/**
+ * Der Pfad für `GET /patienten`.
+ */
+export function patientsPath() {
+  return "/patienten";
+}
