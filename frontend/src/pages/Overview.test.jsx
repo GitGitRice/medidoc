@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,7 +53,7 @@ describe("Overview", () => {
     ).toBeInTheDocument();
   });
 
-  it("zeigt die Patienten als Tabelle, sortiert wie vom Backend geliefert", async () => {
+  it("zeigt einen Patienten mit allen vier Spalten", async () => {
     apiRequest.mockResolvedValue({
       items: [
         {
@@ -77,6 +77,50 @@ describe("Overview", () => {
     expect(screen.getByRole("cell", { name: "Max" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "15.06.1985" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "A123456789" })).toBeInTheDocument();
+  });
+
+  it("übernimmt die vom Backend gelieferte Reihenfolge unverändert", async () => {
+    // Sortiert nach Nachname/Vorname ist Aufgabe des Backends
+    // (service.py: order_by last_name, first_name, id) — absichtlich NICHT
+    // alphabetisch gemockt, damit ein versehentliches eigenes Sortieren im
+    // Frontend hier auffiele.
+    apiRequest.mockResolvedValue({
+      items: [
+        {
+          id: 2,
+          first_name: "Anton",
+          last_name: "Weber",
+          date_of_birth: "1985-06-15",
+          insurance_number: "A123456789",
+        },
+        {
+          id: 3,
+          first_name: "Bea",
+          last_name: "Albrecht",
+          date_of_birth: "1975-03-02",
+          insurance_number: null,
+        },
+        {
+          id: 1,
+          first_name: "Lena",
+          last_name: "Weber",
+          date_of_birth: "1990-01-02",
+          insurance_number: "B987654321",
+        },
+      ],
+      total: 3,
+      limit: 25,
+      offset: 0,
+    });
+
+    renderOverview();
+
+    const rows = await screen.findAllByRole("row");
+    const reihenfolge = rows
+      .slice(1) // erste Zeile ist die Kopfzeile
+      .map((row) => within(row).getAllByRole("cell")[0].textContent);
+
+    expect(reihenfolge).toEqual(["Weber", "Albrecht", "Weber"]);
   });
 
   it("zeigt einen Hinweistext, wenn keine Patienten existieren", async () => {
