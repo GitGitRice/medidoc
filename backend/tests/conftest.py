@@ -21,6 +21,7 @@ import app.db.base  # noqa: F401
 from app.core.security import create_access_token, hash_password
 from app.db.session import get_session
 from app.main import app
+from app.modules.audit.store import MemoryAuditStore, set_store
 from app.modules.patients.models import Patient
 from app.modules.users import service as users_service
 from app.modules.users.models import Role, User
@@ -42,12 +43,32 @@ def session_fixture() -> Generator[Session, None, None]:
         yield session
 
 
+@pytest.fixture(name="audit_store", autouse=True)
+def audit_store_fixture() -> Generator[MemoryAuditStore, None, None]:
+    """Ein leerer Audit-Trail pro Test.
+
+    `autouse`, weil sonst der erste Test, der einen Fehlversuch auslöst, die
+    Zähler für alle folgenden vorbelegt — und die Missbrauchserkennung dann
+    scheinbar zufällig anschlägt. Jeder Test fängt bei null an.
+    """
+    store = MemoryAuditStore()
+    set_store(store)
+
+    yield store
+
+    set_store(None)
+
+
 @pytest.fixture(name="client")
 def client_fixture(session: Session) -> Generator[TestClient, None, None]:
     """Ein Client, dessen Requests auf derselben Session arbeiten wie der Test."""
     app.dependency_overrides[get_session] = lambda: session
 
-    yield TestClient(app)
+    # `raise_server_exceptions=False`: Der TestClient wirft sonst Ausnahmen aus
+    # dem Server heraus, statt sie zu einer 500-Antwort werden zu lassen — und
+    # dann liefe die Middleware, die genau diese 500 protokollieren soll, nie zu
+    # Ende.
+    yield TestClient(app, raise_server_exceptions=False)
 
     app.dependency_overrides.clear()
 
