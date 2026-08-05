@@ -20,9 +20,11 @@ Fehlerantworten haben überall dieselbe Form (`status`, `message`), siehe
 `responses=` an der jeweiligen Funktion und landet damit in `/docs` — das ist
 die Fassung, die das Frontend liest.
 
-Pfad und Query-Parameter sind deutsch (`/patienten`, `?suche=`), die JSON-Keys
-englisch. Die Mischung ist beschlossen und in docs/patients-api.md unter
-„Namensgebung" begründet — sie wird nicht nebenbei im Code umgedreht.
+Pfad, Query-Parameter und JSON-Keys sind englisch (`/patients`, `?q=`). Deutsch
+sind nur Kommentare, Doku und die Oberfläche im Frontend — so steht die Regel in
+ADR-0005 und in beiden API-Verträgen. ADR-0005 nennt im Fließtext weiterhin
+`/patienten`; eine angenommene Entscheidung wird nicht nachträglich
+umgeschrieben, verbindlich ist der Code hier.
 """
 
 from typing import Annotated
@@ -44,8 +46,8 @@ from app.modules.patients.schemas import (
 from app.modules.users.models import Role, User
 
 router = APIRouter(
-    prefix="/patienten",
-    tags=["patienten"],
+    prefix="/patients",
+    tags=["patients"],
     dependencies=[Depends(get_current_user)],
 )
 
@@ -69,7 +71,7 @@ UNPROCESSABLE = {"model": ErrorResponse, "description": "Eingabe ungültig"}
 )
 def list_patients(
     session: SessionDep,
-    suche: Annotated[
+    q: Annotated[
         str | None,
         Query(
             description=(
@@ -88,9 +90,7 @@ def list_patients(
     Findet die Suche nichts, ist `items` eine leere Liste und `total` gleich
     null — das ist **kein** Fehler und wird mit `200` beantwortet.
     """
-    # Der Query-Parameter heißt deutsch wie der Pfad, die Service-Schicht
-    # englisch wie der übrige Code. Die Übersetzung passiert genau hier.
-    items, total = service.search(session, query=suche, limit=limit, offset=offset)
+    items, total = service.search(session, query=q, limit=limit, offset=offset)
     return PatientPage(items=items, total=total, limit=limit, offset=offset)
 
 

@@ -157,11 +157,11 @@ Zwei Dependencies stehen zur Verfügung, sobald der Login steht:
 
 ```python
 # nur angemeldet
-@router.get("/patienten")
+@router.get("/patients")
 def list_patients(user: User = Depends(get_current_user)): ...
 
 # angemeldet und in der erlaubten Rollenmenge
-@router.delete("/patienten/{patient_id}")
+@router.delete("/patients/{patient_id}")
 def delete_patient(
     patient_id: int,
     user: User = Depends(require_roles(Role.ADMIN)),
