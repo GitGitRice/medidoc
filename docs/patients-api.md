@@ -18,7 +18,8 @@ Basis-URL lokal: `http://localhost:8000`
   Sprint 2 in MongoDB ([ADR-0002](./adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)).
 - Pflicht sind nur `first_name`, `last_name`, `date_of_birth`. Alles andere darf fehlen.
 - `GET /patients` liefert **keine nackte Liste**, sondern `{ items, total, limit, offset }`.
-- **Noch ungeschützt** — siehe [Absicherung](#absicherung-kommt-noch) unten.
+- **Alle Endpunkte verlangen einen Token**, `DELETE` zusätzlich die Rolle `admin` — siehe
+  [Absicherung](#absicherung) unten.
 
 | Methode | Pfad | Zweck | Erfolg |
 | ------- | ---- | ----- | ------ |

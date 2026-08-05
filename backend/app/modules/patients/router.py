@@ -15,10 +15,11 @@ Endpunkt — der Fehler soll in die sichere Richtung fallen.
 `require_roles(Role.ADMIN)` kommt zusätzlich an genau `DELETE` — die einzige
 Stelle im Sprint 1, die eine Rolle prüft (ADR-0005).
 
-**Offen fürs Daily:** Der Pfad heißt hier `/patients`, weil CONTEXT.md und
-ADR-0005 festlegen, dass Code und API durchgehend englisch sind. In den
-Beispielen in docs/auth-api.md steht dagegen `/patienten`. Das Frontend muss
-wissen, was gilt — bis das entschieden ist, gilt der Regel nach `/patients`.
+Der Pfad heißt `/patients`, weil CONTEXT.md und ADR-0005 festlegen, dass Code
+und API durchgehend englisch sind. docs/auth-api.md und docs/patients-api.md
+sind darauf gezogen worden; ADR-0005 nennt im Fließtext weiterhin `/patienten`,
+weil eine angenommene Entscheidung nicht nachträglich umgeschrieben wird. Der
+Code hier ist die verbindliche Form.
 """
 
 from typing import Annotated
