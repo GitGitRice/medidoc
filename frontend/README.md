@@ -15,6 +15,21 @@ npm run dev
 Eine andere Backend-Adresse kann über `VITE_API_URL` gesetzt werden. Die erwarteten
 Requests und Responses stehen in [`../docs/auth-api.md`](../docs/auth-api.md).
 
+## Mit Docker Compose starten
+
+Vom Repository-Wurzelverzeichnis aus werden Datenbank, Backend und Frontend gemeinsam
+gestartet. Die `.env` wird nur beim ersten Start angelegt:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Das Frontend ist danach unter <http://localhost:5173> erreichbar. Änderungen im
+`frontend/`-Verzeichnis übernimmt der Vite-Dev-Server automatisch. `VITE_API_URL`
+bezeichnet die aus dem Browser erreichbare Backend-Adresse und ist standardmäßig
+`http://localhost:8000`.
+
 ## Tests
 
 ```bash

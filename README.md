@@ -72,7 +72,18 @@ Versionierung, Anbindung echter Praxissoftware. Begründungen im
 
 ## Lokal starten
 
-_Folgt, sobald das Setup steht._
+Falls noch keine `.env` existiert, einmalig die Beispielkonfiguration kopieren und
+anschließend den vollständigen Stack starten:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Danach sind das Frontend unter <http://localhost:5173>, die API unter
+<http://localhost:8000> und deren interaktive Dokumentation unter
+<http://localhost:8000/docs> erreichbar. Änderungen an Frontend und Backend werden
+von den Entwicklungsservern automatisch übernommen.
 
 ## Projektstruktur
 
