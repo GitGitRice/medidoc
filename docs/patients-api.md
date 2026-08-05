@@ -3,8 +3,8 @@
 > **Zweck:** Damit Frontend und Backend parallel arbeiten können. Diese Datei ist die
 > verbindliche Form. Ändert sich hier etwas, wird es hier geändert und im Daily gesagt.
 >
-> **Sprache:** Code und API sind englisch, deutsch ist nur die Oberfläche im Frontend.
-> JSON-Keys sind also englisch.
+> **Sprache:** JSON-Keys sind englisch, Pfad und Query-Parameter deutsch
+> (`/patienten`, `?suche=`). Siehe [Namensgebung](#namensgebung) unten.
 >
 > Auth-Vertrag: [auth-api.md](./auth-api.md).
 > Rollenmodell: [ADR-0005](./adr/0005-rollen-admin-und-staff.md).
@@ -16,18 +16,18 @@ Basis-URL lokal: `http://localhost:8000`
 
 - Der **Patient** ist die zentrale Einheit. Stammdaten liegen in PostgreSQL, Dokumente ab
   Sprint 2 in MongoDB ([ADR-0002](./adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)).
+- **Jeder Endpunkt verlangt einen gültigen Token.** `DELETE` verlangt zusätzlich `admin`.
 - Pflicht sind nur `first_name`, `last_name`, `date_of_birth`. Alles andere darf fehlen.
-- `GET /patients` liefert **keine nackte Liste**, sondern `{ items, total, limit, offset }`.
-- **Alle Endpunkte verlangen einen Token**, `DELETE` zusätzlich die Rolle `admin` — siehe
-  [Absicherung](#absicherung) unten.
+- `GET /patienten` liefert **keine nackte Liste**, sondern `{ items, total, limit, offset }`.
+- Jede Fehlerantwort hat dieselbe Form: `status` und `message`.
 
-| Methode | Pfad | Zweck | Erfolg |
-| ------- | ---- | ----- | ------ |
-| `GET` | `/patients` | Patientenübersicht, durchsuchbar und seitenweise | `200` |
-| `POST` | `/patients` | Patient anlegen | `201` |
-| `GET` | `/patients/{id}` | Stammdaten eines Patienten | `200` |
-| `PATCH` | `/patients/{id}` | einzelne Felder ändern | `200` |
-| `DELETE` | `/patients/{id}` | endgültig löschen | `204` |
+| Methode | Pfad | Zweck | Erfolg | Verlangt |
+| ------- | ---- | ----- | ------ | -------- |
+| `GET` | `/patienten` | Patientenübersicht, durchsuchbar und seitenweise | `200` | Token |
+| `POST` | `/patienten` | Patient anlegen | `201` | Token |
+| `GET` | `/patienten/{id}` | Stammdaten eines Patienten | `200` | Token |
+| `PATCH` | `/patienten/{id}` | einzelne Felder ändern | `200` | Token |
+| `DELETE` | `/patienten/{id}` | endgültig löschen | `204` | Token + `admin` |
 
 ## Die Stammdaten
 
@@ -58,21 +58,21 @@ solche Fälle bewusst.
 beliebig viele `NULL` zu: Beliebig viele Patienten ohne Nummer sind erlaubt, zwei
 Patienten mit derselben Nummer nicht.
 
-## GET /patients
+## GET /patienten
 
-Die Patientenübersicht. Sortiert nach Nachname, dann Vorname, dann `id` — die
-`id` am Ende macht die Reihenfolge bei Namensgleichheit stabil, sonst springen
-Zeilen beim Blättern.
+Die Patientenübersicht. Sortiert nach Nachname, dann Vorname, dann `id` — die `id` am Ende
+macht die Reihenfolge bei Namensgleichheit stabil, sonst springen Zeilen beim Blättern.
 
 **Request**
 
 ```
-GET /patients?q=hartmann&limit=25&offset=0
+GET /patienten?suche=hartmann&limit=25&offset=0
+Authorization: Bearer <token>
 ```
 
 | Parameter | Standard | Hinweis |
 | --------- | -------- | ------- |
-| `q` | — | sucht in Vorname, Nachname und Versichertennummer |
+| `suche` | — | filtert nach Vorname, Nachname und Versichertennummer |
 | `limit` | `25` | 1–100, darüber `422` |
 | `offset` | `0` | |
 
@@ -110,9 +110,13 @@ Patient später viele Felder hat.
 Seitenzahl und „3 Patienten gefunden". Im Beispiel: drei Treffer, zwei davon abgebildet,
 weil das dritte Ergebnis abgeschnitten wurde.
 
+> **`GET /patienten` liefert eine Seite, nicht alle Datensätze.** Ohne `limit` sind das die
+> ersten 25. Wer wirklich alle will, blättert über `offset` — `limit` ist bei 100 gedeckelt,
+> damit ein Tippfehler nicht die ganze Tabelle zieht.
+
 ### Die Suche
 
-`q` trifft in **Vorname, Nachname oder Versichertennummer**, Groß- und Kleinschreibung
+`suche` trifft in **Vorname, Nachname oder Versichertennummer**, Groß- und Kleinschreibung
 egal, Teiltreffer erlaubt.
 
 Mehrere Wörter werden **UND**-verknüpft, jedes einzelne darf in einem beliebigen der drei
@@ -121,9 +125,18 @@ Felder treffen. Die Reihenfolge ist also egal:
 | Eingabe | Findet |
 | ------- | ------ |
 | `hartmann` | alle Hartmanns |
+| `HARTMANN` | dasselbe |
 | `lena hartmann` | Lena Hartmann |
 | `hartmann lena` | dasselbe |
 | `P1002003` | beide Patienten mit dieser Nummer als Anfang |
+
+**Kein Treffer ist kein Fehler.** Die Antwort ist `200` mit leerer Liste:
+
+```json
+{ "items": [], "total": 0, "limit": 25, "offset": 0 }
+```
+
+`?suche=` ohne Wert verhält sich wie gar kein `suche`.
 
 `%` und `_` werden maskiert und suchen sich selbst — eine Suche nach `%` liefert keine
 Treffer, nicht alle Patienten.
@@ -131,12 +144,18 @@ Treffer, nicht alle Patienten.
 Nicht gesucht wird in Adresse, Notizen und Kasse. Falls das gebraucht wird: sagen, ist ein
 Zweizeiler.
 
-## POST /patients
+**Eine bekannte Grenze:** Groß-/Kleinschreibung ist über Umlaute hinweg egal (`özdemir`
+findet `Özdemir`), aber `YILMAZ` mit gewöhnlichem `I` findet **nicht** `Yılmaz` mit
+punktlosem `ı`. Das sind verschiedene Zeichen, und nur eine türkische Collation brächte sie
+zusammen. Für unseren Scope in Ordnung, hier nur festgehalten, damit es niemanden überrascht.
+
+## POST /patienten
 
 **Request**
 
 ```json
-POST /patients
+POST /patienten
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
@@ -166,15 +185,15 @@ Content-Type: application/json
   "insurance_type": "statutory",
   "notes": null,
   "id": 201,
-  "created_at": "2026-08-03T18:47:10.919290Z",
-  "updated_at": "2026-08-03T18:47:10.919297Z"
+  "created_at": "2026-08-04T09:12:44.919290Z",
+  "updated_at": "2026-08-04T09:12:44.919297Z"
 }
 ```
 
 Nicht gesetzte Felder kommen als `null` zurück, nicht als fehlender Schlüssel. Das
 Frontend muss also nicht zwischen „nicht da" und „leer" unterscheiden.
 
-## GET /patients/{id}
+## GET /patienten/{id}
 
 Liefert denselben vollständigen Patienten wie `POST`.
 
@@ -193,118 +212,155 @@ Liefert denselben vollständigen Patienten wie `POST`.
   "insurance_type": "statutory",
   "notes": null,
   "id": 1,
-  "created_at": "2026-08-03T18:47:09.141101Z",
-  "updated_at": "2026-08-03T18:47:09.141108Z"
+  "created_at": "2026-08-04T09:12:09.141101Z",
+  "updated_at": "2026-08-04T09:12:09.141108Z"
 }
 ```
 
-## PATCH /patients/{id}
+## PATCH /patienten/{id}
 
 Ändert **nur die geschickten Felder**. Weggelassene bleiben, wie sie sind — das Formular
 kann ein einzelnes Feld schicken und muss den Patienten nicht zurückspielen.
 
 ```json
-PATCH /patients/1
+PATCH /patienten/1
+Authorization: Bearer <token>
 Content-Type: application/json
 
 { "city": "Hamburg" }
 ```
 
-Antwort ist der vollständige Patient mit gewandertem `updated_at`.
+Antwort ist der **vollständige** Patient mit gewandertem `updated_at`, nicht nur das
+geänderte Feld.
 
 Die drei Pflichtfelder dürfen **weggelassen**, aber nicht auf `null` gesetzt werden —
 `{"last_name": null}` ergibt `422`. Wer ein optionales Feld leeren will, schickt dagegen
 ganz normal `null`: `{"phone": null}` löscht die Telefonnummer.
 
+Ein leerer Rumpf `{}` ist erlaubt und ändert nichts.
+
 `PUT` gibt es nicht. Bei dreizehn Feldern, von denen zehn optional sind, ist ein
 vollständiges Ersetzen die fehleranfälligere Form — ein vergessenes Feld löscht Daten.
 
-## DELETE /patients/{id}
+## DELETE /patienten/{id}
 
 `204`, kein Rumpf. Der Patient ist danach weg — **kein Soft-Delete, kein Papierkorb.**
+
+**Verlangt die Rolle `admin`.** Für `staff` kommt `403`, und der Patient bleibt unangetastet.
 
 Löschen ist laut [ADR-0005](./adr/0005-rollen-admin-und-staff.md) die einzige Aktion, die
 Daten unwiederbringlich entfernt, und deshalb die einzige, die eine Rolle prüft. Das
 Frontend sollte vorher zurückfragen.
 
+Zweimaliges Löschen ist kein Serverfehler: Der zweite Aufruf findet den Patienten nicht
+mehr und antwortet mit `404`.
+
 ## Fehler
 
-| Status | Wann | Rumpf |
-| ------ | ---- | ----- |
-| `404` | ID gibt es nicht | `{ "detail": "Patient nicht gefunden" }` |
-| `409` | Versichertennummer schon vergeben | `{ "detail": "Diese Versichertennummer ist bereits vergeben" }` |
-| `422` | Validierung | FastAPI-Standardform, siehe unten |
-| `401` / `403` | sobald Auth steht, siehe [auth-api.md](./auth-api.md) | |
+**Jede** Fehlerantwort hat dieselbe Form — unabhängig von Statuscode und Endpunkt:
+
+```json
+{
+  "status": 404,
+  "message": "Patient mit der ID 999999 wurde nicht gefunden"
+}
+```
+
+`status` wiederholt den HTTP-Status im Rumpf. Das ist bewusst redundant: In `catch`-Zweigen
+und in Logs liegt oft nur noch der geparste Rumpf vor, und dann fehlt sonst genau die
+Information, die den Fall einordnet.
+
+`message` ist für Menschen gedacht und kann direkt angezeigt werden. Sie ist deutsch und
+nennt, wo möglich, den konkreten Wert — die gesuchte ID, die vergebene Nummer.
+
+> **`detail` ist zusätzlich weiterhin da**, in genau der Form, die FastAPI ohne unser
+> Zutun erzeugt hätte. Das ist eine Übergangshilfe für Code, der schon `detail` liest.
+> **Neuer Code liest `message`.** Sobald nichts mehr auf `detail` zugreift, fliegt es raus.
+
+| Status | Wann | `message` |
+| ------ | ---- | --------- |
+| `401` | kein, abgelaufener oder ungültiger Token | `Anmeldung erforderlich` |
+| `403` | angemeldet, aber Rolle reicht nicht | `Dazu fehlt dir die Berechtigung` |
+| `404` | ID gibt es nicht | `Patient mit der ID 42 wurde nicht gefunden` |
+| `409` | Versichertennummer schon vergeben | `Die Versichertennummer A123456789 ist bereits einem anderen Patienten zugeordnet` |
+| `422` | Eingabe ungültig | siehe unten |
 
 `409` kommt bei `POST` und bei `PATCH`. Beim `PATCH` ist die **eigene** Nummer erlaubt —
 ein Patient kollidiert nicht mit sich selbst.
 
-Ein `422` listet jedes fehlerhafte Feld einzeln auf. `loc` endet auf dem Feldnamen, damit
-das Formular die Meldung an der richtigen Stelle anzeigen kann:
+Bei `404` und `409` schlägt `404` vor: Wer einen nicht existierenden Patienten ändern will,
+bekommt `404`, auch wenn die mitgeschickte Nummer vergeben wäre.
+
+### 422 — welches Feld ist schuld
+
+Bei Validierungsfehlern kommt `errors` dazu, ein Eintrag pro beanstandetem Feld. `message`
+fasst zusammen und **nennt die Feldnamen**, damit die Meldung auch ohne Auswertung von
+`errors` etwas taugt:
+
+```json
+POST /patienten   { "first_name": "Max" }
+```
 
 ```json
 {
-  "detail": [
-    {
-      "type": "value_error",
-      "loc": ["body", "first_name"],
-      "msg": "Value error, darf nicht leer sein",
-      "input": ""
-    },
-    {
-      "type": "value_error",
-      "loc": ["body", "date_of_birth"],
-      "msg": "Value error, darf nicht in der Zukunft liegen",
-      "input": "2099-01-01"
-    }
+  "status": 422,
+  "message": "Pflichtfelder fehlen: last_name, date_of_birth",
+  "errors": [
+    { "field": "last_name", "message": "Feld ist erforderlich" },
+    { "field": "date_of_birth", "message": "Feld ist erforderlich" }
   ]
 }
 ```
 
-## Absicherung
+`field` ist der Feldname ohne das führende `body`/`query` — direkt der Schlüssel, unter dem
+das Formular sein Eingabefeld führt.
 
-Mit `get_current_user` und `require_roles` gilt:
+Andere Beispiele:
 
-| Endpunkt | Verlangt |
-| -------- | -------- |
-| `GET`, `POST`, `PATCH` auf `/patients` | gültigen Token |
-| `DELETE /patients/{id}` | gültigen Token **und** Rolle `admin` |
-
-Das ist die einzige Stelle im Sprint 1, die eine Rolle prüft. Für das Frontend gilt:
-`401` → Token verwerfen und zur Login-Seite, `403` → Meldung anzeigen, **kein** Logout.
-
-Der Löschen-Button darf für `staff` ausgeblendet werden. Das ist Bedienkomfort, keine
-Absicherung — durchgesetzt wird im Backend.
+| Eingabe | `message` |
+| ------- | --------- |
+| `{"first_name": "   "}` | `Ungültige Eingabe für 'first_name': darf nicht leer sein` |
+| `date_of_birth: "2099-01-01"` | `Ungültige Eingabe für 'date_of_birth': darf nicht in der Zukunft liegen` |
+| `date_of_birth: "14.03.1978"` | `Ungültige Eingabe für 'date_of_birth': Muss ein Datum im Format JJJJ-MM-TT sein` |
+| `PATCH {"last_name": null}` | `Ungültige Eingabe für 'last_name': darf nicht auf null gesetzt werden` |
+| `?limit=1000` | `Ungültige Eingabe für 'limit': Wert ist zu groß` |
 
 ## Für das Frontend
 
 ```js
 const base = "http://localhost:8000";
+const auth = { Authorization: `Bearer ${token}` };
 
 // Übersicht mit Suche und Blättern
-const params = new URLSearchParams({ q: suchbegriff, limit: 25, offset: seite * 25 });
-const res = await fetch(`${base}/patients?${params}`);
+const params = new URLSearchParams({ suche: suchbegriff, limit: 25, offset: seite * 25 });
+const res = await fetch(`${base}/patienten?${params}`, { headers: auth });
 const { items, total } = await res.json();
 
 // Einzelnes Feld ändern
-await fetch(`${base}/patients/${id}`, {
+await fetch(`${base}/patienten/${id}`, {
   method: "PATCH",
-  headers: { "Content-Type": "application/json" },
+  headers: { ...auth, "Content-Type": "application/json" },
   body: JSON.stringify({ city: "Hamburg" }),
 });
+
+// Fehler einheitlich auspacken
+if (!res.ok) {
+  const { message } = await res.json();
+  zeigeMeldung(message);
+}
 ```
 
-An jeden Request kommt der `Authorization`-Header mit dem Bearer-Token, genau wie in
-[auth-api.md](./auth-api.md) beschrieben.
+`401` heißt: Token verwerfen und zur Login-Seite. `403` heißt: Meldung anzeigen, **kein**
+Logout. Die Unterscheidung steht in [auth-api.md](./auth-api.md).
 
-Leere Suche einfach weglassen: `?q=` und gar kein `q` verhalten sich gleich.
+Der Löschen-Button darf für `staff` ausgeblendet werden. Das ist Bedienkomfort, keine
+Absicherung — durchgesetzt wird im Backend.
 
 ## Testdaten
 
 200 frei erfundene Patienten liegen als JSON in
 [`backend/testdata/patients.json`](../backend/testdata/patients.json) — dieselbe Form wie
-der Rumpf von `POST /patients`. **Das Frontend kann die Datei direkt als Mock benutzen**,
-solange es noch nicht gegen die API baut.
+der Rumpf von `POST /patienten`. **Das Frontend kann die Datei direkt als Mock benutzen.**
 
 Anlegen aus `backend/`:
 
@@ -332,19 +388,43 @@ Patienten ohne Adresse, ohne E-Mail oder ohne Versicherung, Geburtsdaten von 193
 
 Reine Testdaten, wie das ganze Projekt — keine echten Patientendaten.
 
+## Automatisierte Tests
+
+Jeder Punkt in dieser Datei hat einen Test in
+[`backend/tests/test_patients_api.py`](../backend/tests/test_patients_api.py), gegliedert
+nach Endpunkt. Aus `backend/`:
+
+```bash
+python -m pytest
+```
+
+Die Tests laufen gegen SQLite im Speicher und brauchen kein laufendes Docker. Was sich
+damit **nicht** prüfen lässt, steht als Kommentar im Testkopf: SQLite ignoriert die
+Groß-/Kleinschreibung nur bei ASCII, die Umlaut-Fälle der Suche sind also nur gegen
+Postgres aussagekräftig.
+
+## Namensgebung
+
+Pfad und Query-Parameter sind deutsch (`/patienten`, `?suche=`), die JSON-Keys englisch
+(`first_name`, `insurance_number`). Das ist eine bewusste Mischung und weicht von der
+Regel in [CONTEXT.md](../CONTEXT.md) ab, nach der die API durchgehend englisch sein sollte.
+
+**Der Stand ist so beschlossen und im Code umgesetzt.** Wer die Regel wiederherstellen
+will, muss `/patienten` → `/patients` und `suche` → `q` ziehen und das Frontend anpassen —
+das ist eine Entscheidung fürs Daily, keine, die nebenbei im Code fällt.
+
+[ADR-0005](./adr/0005-rollen-admin-und-staff.md) nennt weiterhin `/patienten` und ist als
+angenommene Entscheidung nicht nachträglich geändert worden. Insofern deckt sich der Pfad
+mit dem ADR.
+
 ## Offene Punkte
 
-- **`/patients` oder `/patienten`?** [CONTEXT.md](../CONTEXT.md) und
-  [ADR-0005](./adr/0005-rollen-admin-und-staff.md) legen fest, dass Code und API
-  durchgehend englisch sind. Die Beispiele in [auth-api.md](./auth-api.md) schrieben
-  ursprünglich `/patienten`; sie sind auf `/patients` gezogen worden, damit die Doku sich
-  nicht widerspricht. **Gehört trotzdem einmal ins Daily bestätigt** — ADR-0005 ist als
-  angenommene Entscheidung nicht nachträglich geändert worden und nennt dort weiterhin
-  `/patienten`.
 - **`email` wird nicht auf Form geprüft**, nur als String gespeichert. Für echte Prüfung
   müsste `email-validator` in die `requirements.txt`.
 - **Kein Sortierparameter.** Sortiert wird immer nach Nachname. Falls die Tabelle
   klickbare Spaltenköpfe bekommen soll, braucht es ein `sort=`.
+- **`detail` in Fehlerantworten** ist Übergangsballast und soll raus, sobald das Frontend
+  nur noch `message` liest.
 
 ## Nicht enthalten
 

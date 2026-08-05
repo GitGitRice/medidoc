@@ -6,8 +6,9 @@ Die Praxis verwaltet ihre Patienten und die zu ihnen gehörenden Dokumente an ei
 Patientenübersicht als durchsuchbare Tabelle, Stammdatenpflege und eine Akte pro Patient,
 in der Befunde, Arztbriefe und Laborwerte abgelegt werden.
 
-> **Status:** Sprint 1. Anmeldung und die Patienten-Endpunkte stehen, das Frontend zeigt
-> bisher nur die Login-Seite. Fachliche Begriffe in [CONTEXT.md](./CONTEXT.md),
+> **Status:** Sprint 1. Anmeldung und die Patienten-Endpunkte stehen, im Frontend stehen
+> Login und geschütztes Routing — Übersicht und Detailseite sind noch Platzhalter.
+> Fachliche Begriffe in [CONTEXT.md](./CONTEXT.md),
 > Entscheidungen in [docs/adr/](./docs/adr/), Sprint-1-Plan in
 > [docs/sprint-1-plan.md](./docs/sprint-1-plan.md).
 
@@ -79,6 +80,7 @@ _Folgt, sobald das Setup steht._
 
 ```
 backend/            FastAPI-API, nach Features geschnitten — siehe backend/README.md
+backend/tests/      pytest gegen SQLite im Speicher, braucht kein Docker
 backend/testdata/   200 erfundene Testpatienten als JSON, auch als Frontend-Mock nutzbar
 frontend/           React (Vite)
 docs/               ADRs, Sprint-Plan, API-Verträge
