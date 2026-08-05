@@ -1,7 +1,7 @@
 # MediDoc frontend
 
-Minimaler React-Client für die Anmeldung aus Issue #17. Farben, Branding und das
-endgültige Layout sind bewusst noch nicht festgelegt.
+React-Client mit Anmeldung (#17) und Patientenübersicht (#18). Farben, Branding und
+das endgültige Layout sind bewusst noch nicht festgelegt.
 
 ## Lokal starten
 
@@ -28,6 +28,8 @@ Läuft gegen jsdom, ohne Backend — die Netzwerkschicht wird gemockt.
 - `src/api.js` — der einzige Ort, an dem `fetch` steht. Kennt kein React.
 - `src/auth/AuthContext.jsx` — hält Token und Benutzer und stellt `apiFetch` bereit.
 - `src/auth/ProtectedRoute.jsx` — schickt ohne Anmeldung auf `/login`.
+- `src/Layout.jsx` — Kopfzeile und Navigation, gemeinsam für alle angemeldeten Seiten.
+- `src/pages/Overview.jsx` — die Patientenübersicht, holt die Liste über `apiFetch`.
 
 Geschützte Endpunkte werden über `apiFetch` aus `useAuth()` angesprochen, nicht über
 `fetch` oder `apiRequest` direkt. Nur dieser Weg hängt den Token an und meldet bei
