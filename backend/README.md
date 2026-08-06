@@ -7,6 +7,7 @@ FastAPI + SQLModel gegen PostgreSQL.
 | Fachliche Begriffe | [CONTEXT.md](../CONTEXT.md) |
 | Patienten-API | [docs/patients-api.md](../docs/patients-api.md) |
 | Auth-API | [docs/auth-api.md](../docs/auth-api.md) |
+| Logging und Monitoring | [docs/logging-monitoring.md](../docs/logging-monitoring.md) |
 | Entscheidungen | [docs/adr/](../docs/adr/) |
 
 > **Sprache:** Code und API sind englisch, deutsch ist nur die Oberfläche im Frontend.
@@ -75,6 +76,7 @@ beim Import, auch im Test.
 | [tests/test_auth_login.py](tests/test_auth_login.py) | Anmeldung, Token, Fehlermeldungen |
 | [tests/test_auth_authorization.py](tests/test_auth_authorization.py) | Token-Prüfung und Rollen, für **alle** Patienten-Routen auf einmal |
 | [tests/test_patients_api.py](tests/test_patients_api.py) | Patienten-Endpunkte, gegliedert nach Endpunkt |
+| [tests/test_audit.py](tests/test_audit.py) | Audit-Trail, Datensparsamkeit, Missbrauchserkennung, Monitoring |
 
 Was sich gegen SQLite **nicht** prüfen lässt, steht als Kommentar im jeweiligen Testkopf.
 Der wichtigste Fall: SQLite ignoriert die Groß-/Kleinschreibung nur bei ASCII-Zeichen, die
@@ -100,6 +102,8 @@ backend/
     ├── core/            fachlich neutral, gehört allen
     │   ├── config.py    Einstellungen aus der .env im Repo-Wurzelverzeichnis
     │   ├── errors.py    ein Format für alle Fehlerantworten
+    │   ├── logging.py   strukturiertes Log, Redaktion, Anfrage-Kennung
+    │   ├── middleware.py eine Logzeile pro Anfrage, für jeden Endpunkt
     │   └── security.py  Passwort-Hashing (bcrypt) und Token ausstellen (JWT)
     ├── db/              fachlich neutral, gehört allen
     │   ├── session.py   engine, get_session
@@ -107,7 +111,8 @@ backend/
     └── modules/
         ├── patients/    Strang B — Tiran
         ├── users/       Benutzer-Model, Verwaltung ist Sprint 2
-        └── auth/        Strang C — Steven
+        ├── auth/        Strang C — Steven
+        └── audit/       Audit-Trail und Missbrauchserkennung (MongoDB)
 ```
 
 Jedes Modul hat, was es braucht, immer unter demselben Namen:
@@ -119,6 +124,10 @@ Jedes Modul hat, was es braucht, immer unter demselben Namen:
 | `service.py` | Logik und Datenbankzugriffe | **nein** |
 | `router.py` | Endpunkte | ja |
 | `seed.py` | Testdaten des Moduls | nein |
+
+Eine Ausnahme: `modules/audit/` hat `store.py` statt `models.py` — sein Trail liegt in
+MongoDB, nicht in Postgres, und hat deshalb keine SQLModel-Tabelle
+([ADR-0007](../docs/adr/0007-mongodb-fuer-audit-und-monitoring.md)).
 
 Die eine Regel, die den Rest trägt: **`service.py` kennt kein HTTP.** Keine
 `HTTPException`, keine Statuscodes, keine `Depends`. Der Router übersetzt zwischen beidem.
@@ -212,6 +221,29 @@ Drei Dinge, die beim Lesen des Codes sonst überraschen:
 
 Damit die Doku nicht doppelt gepflegt werden muss: Alles Fachliche gehört nach
 `docs/patients-api.md`, hier steht nur, wie der Code aufgebaut ist.
+
+## Logging und Monitoring
+
+Der vollständige Aufbau steht in
+**[docs/logging-monitoring.md](../docs/logging-monitoring.md)**. Kurz, drei Schichten:
+
+| Schicht | Frage | Wo |
+| ------- | ----- | -- |
+| Log | Was tut der Server gerade? | stdout, eine Zeile pro Anfrage |
+| Audit-Trail | Wer hat wann was getan? | MongoDB, 30 Tage |
+| Erkennung | Rüttelt jemand an einer Tür? | zählt über den Trail, **blockiert nie** |
+
+Drei Regeln, an die sich jeder halten muss, der hier etwas ergänzt:
+
+- **Nie Geheimnisse loggen.** `app/core/logging.py` ersetzt Passwörter, Token und Hashes
+  durch `***`. Ein neues Feld mit einem Geheimnis gehört in `REDACTED_KEYS`.
+- **Nie Patientendaten in den Trail.** Nur `patient:42`, nie Name oder Versichertennummer.
+  Der Trail liegt dauerhaft in einer eigenen Datenbank.
+- **Protokollieren darf nie einen Request kippen.** `audit.service.record` wirft nicht.
+
+Ohne `MONGO_URL` läuft der Trail im Prozessspeicher — so laufen Tests und CI, ohne
+Datenbank-Service. `GET /monitoring/ereignisse` und `/monitoring/regeln` zeigen den Trail,
+nur für `admin` und nur lesend.
 
 ## Testdaten
 

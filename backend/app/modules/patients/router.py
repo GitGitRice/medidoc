@@ -29,11 +29,13 @@ umgeschrieben, verbindlich ist der Code hier.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlmodel import Session
 
 from app.core.errors import ErrorResponse
 from app.db.session import get_session
+from app.modules.audit import service as audit
+from app.modules.audit.events import EventType
 from app.modules.auth.dependencies import get_current_user, require_roles
 from app.modules.patients import service
 from app.modules.patients.models import Patient
@@ -101,14 +103,16 @@ def list_patients(
     summary="Patient anlegen",
     responses={401: UNAUTHORIZED, 409: CONFLICT, 422: UNPROCESSABLE},
 )
-def create_patient(session: SessionDep, data: PatientCreate) -> Patient:
+def create_patient(request: Request, session: SessionDep, data: PatientCreate) -> Patient:
     """Legt einen Patienten an und gibt ihn mit vergebener `id` zurück.
 
     Fehlt ein Pflichtfeld, antwortet die API mit `422` und nennt in `message`
     und `errors`, welches Feld es ist.
     """
     _reject_taken_insurance_number(session, data.insurance_number)
-    return service.create(session, data)
+    patient = service.create(session, data)
+    _audit(request, EventType.PATIENT_CREATED, patient, status.HTTP_201_CREATED)
+    return patient
 
 
 @router.get(
@@ -134,7 +138,7 @@ def get_patient(session: SessionDep, patient_id: int) -> Patient:
     },
 )
 def update_patient(
-    session: SessionDep, patient_id: int, data: PatientUpdate
+    request: Request, session: SessionDep, patient_id: int, data: PatientUpdate
 ) -> Patient:
     """Ändert nur die mitgeschickten Felder und gibt den ganzen Patienten zurück.
 
@@ -144,7 +148,17 @@ def update_patient(
     """
     patient = _get_or_404(session, patient_id)
     _reject_taken_insurance_number(session, data.insurance_number, exclude_id=patient_id)
-    return service.update(session, patient, data)
+    geaendert = service.update(session, patient, data)
+    # Welche Felder angefasst wurden, nicht womit sie gefüllt wurden — der
+    # Trail hält keine Patientendaten.
+    _audit(
+        request,
+        EventType.PATIENT_UPDATED,
+        geaendert,
+        status.HTTP_200_OK,
+        fields=sorted(data.model_dump(exclude_unset=True)),
+    )
+    return geaendert
 
 
 @router.delete(
@@ -153,13 +167,43 @@ def update_patient(
     summary="Patient löschen",
     responses={401: UNAUTHORIZED, 403: FORBIDDEN, 404: NOT_FOUND},
 )
-def delete_patient(session: SessionDep, _user: AdminUser, patient_id: int) -> None:
+def delete_patient(
+    request: Request, session: SessionDep, _user: AdminUser, patient_id: int
+) -> None:
     """Löscht einen Patienten endgültig — nur als `admin`.
 
     Zweimaliges Löschen ist kein Serverfehler: Der zweite Aufruf findet den
     Patienten nicht mehr und antwortet mit `404`.
     """
-    service.delete(session, _get_or_404(session, patient_id))
+    patient = _get_or_404(session, patient_id)
+    service.delete(session, patient)
+    # Nach dem Löschen protokolliert: Der Eintrag im Trail ist ab jetzt der
+    # einzige Beleg, dass es diesen Patienten je gab.
+    _audit(request, EventType.PATIENT_DELETED, None, status.HTTP_204_NO_CONTENT, patient_id=patient_id)
+
+
+def _audit(
+    request: Request,
+    event: EventType,
+    patient: Patient | None,
+    status_code: int,
+    patient_id: int | None = None,
+    **detail: object,
+) -> None:
+    """Hält eine Änderung an einem Patienten im Audit-Trail fest.
+
+    Nur die Kennung, nie Name, Geburtsdatum oder Versichertennummer — der Trail
+    liegt dauerhaft in einer eigenen Datenbank, siehe `audit/events.py`.
+    """
+    kennung = patient.id if patient is not None else patient_id
+    audit.record(
+        event,
+        request=request,
+        status=status_code,
+        user_id=request.state.user_id,
+        target=f"patient:{kennung}",
+        detail=detail,
+    )
 
 
 def _get_or_404(session: Session, patient_id: int) -> Patient:

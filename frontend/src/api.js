@@ -21,6 +21,14 @@ export class ApiError extends Error {
 
 const GENERIC_ERROR = "Die Anfrage ist fehlgeschlagen.";
 
+/**
+ * Die Meldung zu einem `403` — der Wortlaut aus docs/auth-api.md.
+ *
+ * Steht hier und nicht in einer Seite, damit jede Stelle, die eine Rolle nicht
+ * hat, denselben Satz zeigt.
+ */
+export const FORBIDDEN_ERROR = "Dazu fehlt dir die Berechtigung";
+
 async function readResponse(response) {
   if (response.status === 204) {
     return null;
@@ -41,10 +49,18 @@ async function readResponse(response) {
  * bei einem Validierungsfehler aber mit einer *Liste* von Objekten unter
  * demselben Schlüssel. Ungeprüft übernommen stünde davon "[object Object]" in
  * der Oberfläche, deshalb wird hier auf einen String bestanden.
+ *
+ * Bei `403` steht die Meldung auch dann fest, wenn die Antwort keine mitbringt:
+ * Der Fall ist immer derselbe — angemeldet, aber die Rolle reicht nicht — und
+ * dafür ist "Die Anfrage ist fehlgeschlagen." keine Auskunft.
  */
-function errorMessage(body) {
+function errorMessage(body, status) {
   if (typeof body === "object" && typeof body?.detail === "string") {
     return body.detail;
+  }
+
+  if (status === 403) {
+    return FORBIDDEN_ERROR;
   }
 
   return GENERIC_ERROR;
@@ -77,7 +93,7 @@ export async function apiRequest(path, { token, headers, ...options } = {}) {
   const body = await readResponse(response);
 
   if (!response.ok) {
-    throw new ApiError(errorMessage(body), response.status);
+    throw new ApiError(errorMessage(body, response.status), response.status);
   }
 
   return body;

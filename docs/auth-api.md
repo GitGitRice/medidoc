@@ -148,8 +148,29 @@ fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 beim Start wieder ein — mit einem `GET /auth/me`, um zu prüfen, ob er noch gilt.
 `ProtectedRoute` leitet ohne gültigen Benutzer auf `/login` um.
 
-Die Rolle darf benutzt werden, um den Löschen-Button auszublenden. Das ist Bedienkomfort,
-keine Absicherung — durchgesetzt wird im Backend.
+### Die Rolle prüfen
+
+`useAuth()` gibt dafür `hasRole` heraus. Damit hängt eine Aktion an der Rolle, ohne dass
+eine Seite `user.role` selbst auseinandernimmt:
+
+```jsx
+const { hasRole } = useAuth();
+
+{hasRole("admin") && <button onClick={loeschen}>Löschen</button>}
+```
+
+- Ohne angemeldeten Benutzer ist die Antwort `false` — kein Absturz an `user.role`.
+- Mehrere Rollen werden als **Menge** geprüft: `hasRole("admin", "staff")` ist wahr, wenn
+  der Benutzer eine davon hat — dieselbe Regel wie `require_roles` im Backend.
+
+**Ausblenden ist Bedienkomfort, keine Absicherung — durchgesetzt wird im Backend.** Ein
+ausgeblendeter Button ist kein Schutz: Wer den Request von Hand schickt, bekommt trotzdem
+`403`. Deshalb bleibt die Prüfung im Backend die einzige, auf die es ankommt.
+
+Kommt ein `403` zurück, steht in `error.message` der Satz **"Dazu fehlt dir die
+Berechtigung"** — auch dann, wenn die Antwort selbst keine Meldung mitbringt
+(`FORBIDDEN_ERROR` in `frontend/src/api.js`). Die Sitzung bleibt dabei bestehen, `apiFetch`
+meldet nur bei `401` ab.
 
 ## Für das Backend
 
