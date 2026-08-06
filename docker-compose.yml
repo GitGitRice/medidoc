@@ -52,7 +52,6 @@ services:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
       - fastapi
-    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
     restart: unless-stopped
 volumes:
   postgres_data:
