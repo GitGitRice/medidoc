@@ -38,12 +38,16 @@ services:
     working_dir: /app
     volumes:
       - ./backend:/app
+      # Die hochgeladenen Dateien. Eigenes Volume, nicht im Code-Mount: Sie
+      # sollen einen Neustart ueberleben und nicht im Repo landen.
+      - uploads_data:/data/uploads
     env_file:
       - .env
     environment:
       # Im Compose-Netz heisst die Datenbank wie ihr Service, nicht localhost.
       POSTGRES_HOST: postgres
       MONGO_URL: mongodb://mongo:27017
+      UPLOAD_DIR: /data/uploads
       LOG_JSON: "true"
     ports:
       - "8000:8000"
@@ -57,3 +61,4 @@ services:
 volumes:
   postgres_data:
   mongo_data:
+  uploads_data:

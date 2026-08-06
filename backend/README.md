@@ -7,6 +7,7 @@ FastAPI + SQLModel gegen PostgreSQL.
 | Fachliche Begriffe | [CONTEXT.md](../CONTEXT.md) |
 | Patienten-API | [docs/patients-api.md](../docs/patients-api.md) |
 | Auth-API | [docs/auth-api.md](../docs/auth-api.md) |
+| Dokumente-API | [docs/documents-api.md](../docs/documents-api.md) |
 | Logging und Monitoring | [docs/logging-monitoring.md](../docs/logging-monitoring.md) |
 | Entscheidungen | [docs/adr/](../docs/adr/) |
 
@@ -77,6 +78,7 @@ beim Import, auch im Test.
 | [tests/test_auth_authorization.py](tests/test_auth_authorization.py) | Token-Prüfung und Rollen, für **alle** Patienten-Routen auf einmal |
 | [tests/test_patients_api.py](tests/test_patients_api.py) | Patienten-Endpunkte, gegliedert nach Endpunkt |
 | [tests/test_audit.py](tests/test_audit.py) | Audit-Trail, Datensparsamkeit, Missbrauchserkennung, Monitoring |
+| [tests/test_documents_api.py](tests/test_documents_api.py) | Datei-Upload, 20-MB-Grenze, Ablage auf der Platte |
 
 Was sich gegen SQLite **nicht** prüfen lässt, steht als Kommentar im jeweiligen Testkopf.
 Der wichtigste Fall: SQLite ignoriert die Groß-/Kleinschreibung nur bei ASCII-Zeichen, die
@@ -112,6 +114,7 @@ backend/
         ├── patients/    Strang B — Tiran
         ├── users/       Benutzer-Model, Verwaltung ist Sprint 2
         ├── auth/        Strang C — Steven
+        ├── documents/   Datei-Upload je Patient (MongoDB + Volume)
         └── audit/       Audit-Trail und Missbrauchserkennung (MongoDB)
 ```
 
@@ -125,8 +128,8 @@ Jedes Modul hat, was es braucht, immer unter demselben Namen:
 | `router.py` | Endpunkte | ja |
 | `seed.py` | Testdaten des Moduls | nein |
 
-Eine Ausnahme: `modules/audit/` hat `store.py` statt `models.py` — sein Trail liegt in
-MongoDB, nicht in Postgres, und hat deshalb keine SQLModel-Tabelle
+Zwei Ausnahmen: `modules/audit/` und `modules/documents/` haben `store.py` statt `models.py` — ihre Daten liegen in
+MongoDB, nicht in Postgres, und haben deshalb keine SQLModel-Tabelle
 ([ADR-0007](../docs/adr/0007-mongodb-fuer-audit-und-monitoring.md)).
 
 Die eine Regel, die den Rest trägt: **`service.py` kennt kein HTTP.** Keine

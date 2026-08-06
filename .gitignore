@@ -23,3 +23,6 @@ build/
 # Logs
 *.log
 npm-debug.log*
+
+# Lokal hochgeladene Dokumente (im Container ein Docker-Volume)
+uploads/
