@@ -32,7 +32,7 @@ ohne Konsequenz.
 | `staff` | Patienten lesen, anlegen, bearbeiten; Dokumente lesen und anlegen |
 | `admin` | alles von `staff`, zusätzlich Patienten löschen und Benutzer verwalten |
 
-In Sprint 1 ist davon genau eine Zeile wirksam: **`DELETE /patienten/{id}` verlangt
+In Sprint 1 ist davon genau eine Zeile wirksam: **`DELETE /patients/{id}` verlangt
 `admin`**, alles andere verlangt nur einen gültigen Token. Die Benutzerverwaltung
 (anlegen, deaktivieren, Rolle ändern) ist Sprint 2. Damit gibt es einen sichtbaren,
 vorführbaren Rollenunterschied und keine Rollenlogik, die über die Anwendung verstreut ist.

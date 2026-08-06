@@ -22,9 +22,7 @@ die Fassung, die das Frontend liest.
 
 Pfad, Query-Parameter und JSON-Keys sind englisch (`/patients`, `?q=`). Deutsch
 sind nur Kommentare, Doku und die Oberfläche im Frontend — so steht die Regel in
-ADR-0005 und in beiden API-Verträgen. ADR-0005 nennt im Fließtext weiterhin
-`/patienten`; eine angenommene Entscheidung wird nicht nachträglich
-umgeschrieben, verbindlich ist der Code hier.
+ADR-0005 und in beiden API-Verträgen.
 """
 
 from typing import Annotated
