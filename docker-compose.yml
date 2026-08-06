@@ -22,7 +22,7 @@ services:
     volumes:
       - mongo_data:/data/db
     ports:
-      - 27017:27017
+      - "${MONGO_DB_PORT:-27017}:27017"
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 5s
@@ -38,6 +38,8 @@ services:
     working_dir: /app
     volumes:
       - ./backend:/app
+      # Anhaenge liegen als Dateien im Volume; MongoDB speichert nur Metadaten und Pfad.
+      - document_attachments:/data/attachments
     env_file:
       - .env
     environment:
@@ -45,15 +47,17 @@ services:
       POSTGRES_HOST: postgres
       MONGO_URL: mongodb://mongo:27017
       LOG_JSON: "true"
+      ATTACHMENTS_DIR: /data/attachments
     ports:
       - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
       mongo:
-        condition: service_started
+        condition: service_healthy
     command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     restart: unless-stopped
 volumes:
   postgres_data:
   mongo_data:
+  document_attachments:
