@@ -15,15 +15,18 @@ fragen, Antwort in Token und Statuscode gießen. Die Prüfung selbst steht in
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session
 
 from app.core.security import create_access_token
 from app.db.session import get_session
+from app.modules.audit import service as audit
+from app.modules.audit.events import EventType
 from app.modules.auth import service
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.schemas import TokenResponse
+from app.modules.users import service as users_service
 from app.modules.users.models import User
 from app.modules.users.schemas import UserPublic
 
@@ -38,6 +41,7 @@ INVALID_CREDENTIALS = "E-Mail oder Passwort ist falsch"
 
 @router.post("/login", response_model=TokenResponse)
 def login(
+    request: Request,
     session: SessionDep,
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> TokenResponse:
@@ -48,7 +52,18 @@ def login(
     """
     user = service.authenticate(session, email=form.username, password=form.password)
 
+    # Beide Ausgänge landen im Audit-Trail. Der fehlgeschlagene Versuch wird
+    # hier festgehalten und nicht in der Middleware, weil nur an dieser Stelle
+    # bekannt ist, *welches Konto* gemeint war — die Antwort verrät es bewusst
+    # nicht. Das Passwort wird nirgends mitgegeben; die versuchte E-Mail
+    # normalisiert, damit "Anna@…" und "anna@…" als derselbe Versuch zählen.
     if user is None:
+        audit.record(
+            EventType.LOGIN_FAILED,
+            request=request,
+            email=users_service.normalize_email(form.username),
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=INVALID_CREDENTIALS,
@@ -56,6 +71,14 @@ def login(
             # Authorize-Button in /docs richtig reagieren.
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    audit.record(
+        EventType.LOGIN_SUCCEEDED,
+        request=request,
+        email=user.email,
+        user_id=user.id,
+        status=status.HTTP_200_OK,
+    )
 
     return TokenResponse(
         access_token=create_access_token(user.id, user.role),

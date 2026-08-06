@@ -93,6 +93,7 @@ bevor sie fertig sind:
 
 - [docs/patients-api.md](./docs/patients-api.md) — Patientenübersicht, Stammdaten, CRUD
 - [docs/auth-api.md](./docs/auth-api.md) — Login, Token, Rollen
+- [docs/logging-monitoring.md](./docs/logging-monitoring.md) — Log, Audit-Trail, Missbrauchserkennung
 
 ## Sprints
 
