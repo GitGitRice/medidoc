@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiRequest, getCurrentUser } from "../api.js";
+import { ApiError, apiRequest, FORBIDDEN_ERROR, getCurrentUser } from "../api.js";
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
 
 // Nur die Netzwerkfunktionen ersetzen — `ApiError` bleibt die echte Klasse,
@@ -22,16 +22,68 @@ const user = {
   role: "admin",
 };
 
+const staffUser = {
+  id: 2,
+  email: "sven.staff@medidoc.test",
+  name: "Sven Staff",
+  role: "staff",
+};
+
 /** Eine wiederhergestellte Sitzung — der Ausgangspunkt aller Tests hier. */
-async function renderAngemeldet() {
+async function renderAngemeldet(angemeldet = user) {
   window.localStorage.setItem(TOKEN_KEY, "stored-token");
-  getCurrentUser.mockResolvedValue(user);
+  getCurrentUser.mockResolvedValue(angemeldet);
 
   const rendered = renderHook(() => useAuth(), { wrapper: AuthProvider });
-  await waitFor(() => expect(rendered.result.current.user).toEqual(user));
+  await waitFor(() => expect(rendered.result.current.user).toEqual(angemeldet));
 
   return rendered;
 }
+
+describe("hasRole", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sagt ohne angemeldeten Benutzer zu jeder Rolle nein", async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.hasRole("admin")).toBe(false);
+    expect(result.current.hasRole("staff")).toBe(false);
+  });
+
+  it("erkennt die Rolle admin", async () => {
+    const { result } = await renderAngemeldet();
+
+    expect(result.current.hasRole("admin")).toBe(true);
+    expect(result.current.hasRole("staff")).toBe(false);
+  });
+
+  it("erkennt die Rolle staff", async () => {
+    const { result } = await renderAngemeldet(staffUser);
+
+    expect(result.current.hasRole("staff")).toBe(true);
+    expect(result.current.hasRole("admin")).toBe(false);
+  });
+
+  it("prüft gegen die Menge, wenn mehrere Rollen genannt sind", async () => {
+    // Wie `require_roles` im Backend: erlaubt ist, wer *eine* davon hat.
+    const { result } = await renderAngemeldet(staffUser);
+
+    expect(result.current.hasRole("admin", "staff")).toBe(true);
+  });
+
+  it("sagt nach dem Abmelden wieder nein", async () => {
+    const { result } = await renderAngemeldet();
+
+    act(() => {
+      result.current.logout();
+    });
+
+    expect(result.current.hasRole("admin")).toBe(false);
+  });
+});
 
 describe("apiFetch", () => {
   beforeEach(() => {
@@ -64,18 +116,20 @@ describe("apiFetch", () => {
     expect(window.localStorage.getItem(TOKEN_KEY)).toBeNull();
   });
 
-  it("meldet bei 403 nicht ab", async () => {
-    // Da fehlt eine Rolle, nicht die Anmeldung — docs/auth-api.md.
-    const { result } = await renderAngemeldet();
-    apiRequest.mockRejectedValue(new ApiError("Dazu fehlt dir die Berechtigung", 403));
+  it("meldet bei 403 nicht ab und reicht die Meldung durch", async () => {
+    // Da fehlt eine Rolle, nicht die Anmeldung — docs/auth-api.md. Die Meldung
+    // muss beim Aufrufer ankommen, denn nur dort steht die Oberfläche.
+    const { result } = await renderAngemeldet(staffUser);
+    apiRequest.mockRejectedValue(new ApiError(FORBIDDEN_ERROR, 403));
 
     await act(async () => {
       await expect(result.current.apiFetch("/patients/1")).rejects.toMatchObject({
         status: 403,
+        message: "Dazu fehlt dir die Berechtigung",
       });
     });
 
-    expect(result.current.user).toEqual(user);
+    expect(result.current.user).toEqual(staffUser);
     expect(window.localStorage.getItem(TOKEN_KEY)).toBe("stored-token");
   });
 });
