@@ -6,8 +6,10 @@ Die Praxis verwaltet ihre Patienten und die zu ihnen gehörenden Dokumente an ei
 Patientenübersicht als durchsuchbare Tabelle, Stammdatenpflege und eine Akte pro Patient,
 in der Befunde, Arztbriefe und Laborwerte abgelegt werden.
 
-> **Status:** Konzeptphase. Fachliche Begriffe in [CONTEXT.md](./CONTEXT.md),
-> Entscheidungen in [docs/adr/](./docs/adr/), Planungsvorschlag für Sprint 1 in
+> **Status:** Sprint 1. Anmeldung und die Patienten-Endpunkte stehen, im Frontend stehen
+> Login und geschütztes Routing — Übersicht und Detailseite sind noch Platzhalter.
+> Fachliche Begriffe in [CONTEXT.md](./CONTEXT.md),
+> Entscheidungen in [docs/adr/](./docs/adr/), Sprint-1-Plan in
 > [docs/sprint-1-plan.md](./docs/sprint-1-plan.md).
 
 ## Team
@@ -120,33 +122,17 @@ Test, Dokumentation, Abschlusspräsentation.
 
 ## Projekttagebuch
 
-Tägliche Einträge: Was wurde erledigt, woran wird gearbeitet, welche Hindernisse gibt es.
+Das Tagebuch steht in **[docs/Diary.md](./docs/Diary.md)** — ein Eintrag pro Person und
+Tag, neueste oben. Jeder ergänzt seinen eigenen vor Feierabend.
 
-### Woche 1
+Bewusst nur an einer Stelle: Zwei Tagebücher heißen, dass beide veralten.
 
-| Tag | Ergebnisse | Hindernisse |
-| --- | ---------- | ----------- |
-| Mo | | |
-| Di | | |
-| Mi | | |
-| Do | | |
-| Fr | | |
+### Sprint Review und Retrospektive
 
-**Sprint Review:** _tbd_
-**Retrospektive:** Was lief gut / Was hat gebremst / Was verbessern wir
-
-### Woche 2
-
-| Tag | Ergebnisse | Hindernisse |
-| --- | ---------- | ----------- |
-| Mo | | |
-| Di | | |
-| Mi | | |
-| Do | | |
-| Fr | | |
-
-**Sprint Review:** _tbd_
-**Retrospektive:** _tbd_
+| Woche | Review | Retrospektive |
+| ----- | ------ | ------------- |
+| 1 | _tbd_ | _tbd_ |
+| 2 | _tbd_ | _tbd_ |
 
 ## Entscheidungen
 

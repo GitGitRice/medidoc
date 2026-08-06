@@ -148,11 +148,11 @@ def _level(status: int) -> int:
 
 
 def _target(pfad: str) -> str | None:
-    """`/patienten/42` wird zu `patient:42`.
+    """`/patients/42` wird zu `patient:42`.
 
     Nur die Kennung, nie der Patient selbst — siehe `audit/events.py`.
     """
     teile = [t for t in pfad.split("/") if t]
-    if len(teile) == 2 and teile[0] == "patienten" and teile[1].isdigit():
+    if len(teile) == 2 and teile[0] == "patients" and teile[1].isdigit():
         return f"patient:{teile[1]}"
     return None
