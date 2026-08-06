@@ -72,7 +72,21 @@ Versionierung, Anbindung echter Praxissoftware. Begründungen im
 
 ## Lokal starten
 
-_Folgt, sobald das Setup steht._
+Falls noch keine `.env` existiert, einmalig die Beispielkonfiguration kopieren und
+anschließend die Services starten:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Die API ist danach unter <http://localhost:8000> und ihre interaktive Dokumentation
+unter <http://localhost:8000/docs> erreichbar.
+
+PostgreSQL speichert die Patientenstammdaten im Volume `postgres_data`. MongoDB legt
+Dokument-Metadaten im Volume `mongo_data` ab; die eigentlichen Anhänge liegen getrennt
+im Volume `document_attachments`. `docker compose down` behält diese Daten, während
+`docker compose down -v` alle drei Volumes und deren Inhalte löscht.
 
 ## Projektstruktur
 
