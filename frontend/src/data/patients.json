@@ -1,0 +1,12 @@
+[
+  {
+    "id": 1,
+    "name": "Max Mustermann",
+    "birthDate": "1980-05-12"
+  },
+  {
+    "id": 2,
+    "name": "Erika Musterfrau",
+    "birthDate": "1992-11-03"
+  }
+]

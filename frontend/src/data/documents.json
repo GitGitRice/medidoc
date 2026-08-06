@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1,
+    "patientId": 1,
+    "title": "Arztbrief Kardiologie",
+    "important": true,
+    "description": "Zusammenfassung der stationären Behandlung mit Empfehlungen für die Nachsorge.",
+    "tags": "Herz,Kardiologie,Blutdruck"
+  },
+  {
+    "id": 2,
+    "patientId": 1,
+    "title": "Laborbefund",
+    "important": false,
+    "description": "Blutbild und Entzündungsparameter ohne auffällige Befunde.",
+    "tags": "Labor,Blutbild,CRP"
+  },
+  {
+    "id": 3,
+    "patientId": 2,
+    "title": "Röntgen Thorax",
+    "important": true,
+    "description": "Röntgenaufnahme des Brustkorbs zur Kontrolle der Lunge.",
+    "tags": "Radiologie,Lunge,Thorax"
+  },
+  {
+    "id": 4,
+    "patientId": 2,
+    "title": "Entlassungsbericht",
+    "important": true,
+    "description": "Abschlussbericht nach stationärem Aufenthalt.",
+    "tags": "Entlassung,Therapie,Nachsorge"
+  },
+  {
+    "id": 5,
+    "patientId": 3,
+    "title": "MRT Knie",
+    "important": false,
+    "description": "MRT zur Abklärung von Schmerzen im rechten Knie.",
+    "tags": "Orthopädie,MRT,Knie"
+  },
+  {
+    "id": 6,
+    "patientId": 3,
+    "title": "Physiotherapie Bericht",
+    "important": false,
+    "description": "Dokumentation der bisherigen Therapiefortschritte.",
+    "tags": "Physiotherapie,Bewegung,Rehabilitation"
+  },
+  {
+    "id": 7,
+    "patientId": 4,
+    "title": "Diabetes Verlauf",
+    "important": true,
+    "description": "Kontrolle der Blutzuckerwerte und Anpassung der Medikation.",
+    "tags": "Diabetes,Blutzucker,Medikation"
+  },
+  {
+    "id": 8,
+    "patientId": 4,
+    "title": "Augenarzt Befund",
+    "important": false,
+    "description": "Regelmäßige Kontrolle der Sehschärfe und Netzhaut.",
+    "tags": "Augenheilkunde,Sehen,Netzhaut"
+  },
+  {
+    "id": 9,
+    "patientId": 5,
+    "title": "Operationsbericht",
+    "important": true,
+    "description": "Dokumentation einer erfolgreich durchgeführten Hüftoperation.",
+    "tags": "Operation,Hüfte,Chirurgie"
+  },
+  {
+    "id": 10,
+    "patientId": 5,
+    "title": "Reha Abschluss",
+    "important": false,
+    "description": "Abschlussbericht der Rehabilitationsmaßnahme mit Empfehlungen.",
+    "tags": "Rehabilitation,Nachsorge,Mobilität"
+  }
+]
