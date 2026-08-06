@@ -20,7 +20,7 @@ from app.modules.audit.store import MemoryAuditStore
 from app.modules.users.models import Role
 
 LOGIN = "/auth/login"
-PATIENTEN = "/patienten"
+PATIENTEN = "/patients"
 
 
 def anmelden(client: TestClient, email: str, passwort: str):

@@ -204,20 +204,20 @@ Felder, Beispielantworten, Fehlerfälle, Hinweise fürs Frontend. Hier nur der �
 
 | Methode | Pfad | Zweck | Verlangt |
 | ------- | ---- | ----- | -------- |
-| `GET` | `/patienten?suche=&limit=&offset=` | Patientenübersicht, durchsuchbar und seitenweise | Token |
-| `POST` | `/patienten` | anlegen → `201` | Token |
-| `GET` | `/patienten/{id}` | Stammdaten | Token |
-| `PATCH` | `/patienten/{id}` | einzelne Felder ändern | Token |
-| `DELETE` | `/patienten/{id}` | endgültig löschen → `204` | Token + `admin` |
+| `GET` | `/patients?q=&limit=&offset=` | Patientenübersicht, durchsuchbar und seitenweise | Token |
+| `POST` | `/patients` | anlegen → `201` | Token |
+| `GET` | `/patients/{id}` | Stammdaten | Token |
+| `PATCH` | `/patients/{id}` | einzelne Felder ändern | Token |
+| `DELETE` | `/patients/{id}` | endgültig löschen → `204` | Token + `admin` |
 
 Drei Dinge, die beim Lesen des Codes sonst überraschen:
 
 - **Nur drei Pflichtfelder** — `first_name`, `last_name`, `date_of_birth`. Ein Patient
   ohne Telefonnummer und ohne Versicherung ist gültig.
-- `GET /patienten` liefert `{ items, total, limit, offset }`, keine nackte Liste. `total`
+- `GET /patients` liefert `{ items, total, limit, offset }`, keine nackte Liste. `total`
   ist die Trefferzahl ohne Paging.
-- **Pfad und Query-Parameter sind deutsch, die JSON-Keys englisch.** Bewusste Mischung,
-  siehe [Namensgebung](../docs/patients-api.md#namensgebung).
+- **Pfad, Query-Parameter und JSON-Keys sind englisch**, deutsch sind nur Kommentare und
+  Doku — siehe [Namensgebung](../docs/patients-api.md#namensgebung).
 
 Damit die Doku nicht doppelt gepflegt werden muss: Alles Fachliche gehört nach
 `docs/patients-api.md`, hier steht nur, wie der Code aufgebaut ist.
@@ -248,7 +248,7 @@ nur für `admin` und nur lesend.
 ## Testdaten
 
 [`testdata/patients.json`](testdata/patients.json) — 200 frei erfundene Patienten, in
-derselben Form wie der Rumpf von `POST /patienten`. **Das Frontend kann die Datei direkt
+derselben Form wie der Rumpf von `POST /patients`. **Das Frontend kann die Datei direkt
 als Mock benutzen**, solange es noch nicht gegen die API baut.
 
 Als JSON neben dem Code und nicht als Python-Literal darin: So kommt das Frontend an
@@ -265,10 +265,6 @@ kaputter Eintrag fällt damit sofort auf und nicht erst, wenn das Frontend ihn a
 
 ## Offene Punkte
 
-- **Deutscher Pfad, englische JSON-Keys.** `/patienten` und `?suche=` stehen so im Code und
-  decken sich mit ADR-0005; die Regel in CONTEXT.md („API durchgehend englisch") tut das
-  nicht. Der Stand ist umgesetzt und dokumentiert, die Regel selbst gehört
-  **einmal im Daily nachgezogen** — entweder CONTEXT.md anpassen oder die Pfade zurückziehen.
 - **Keine Migrationen.** `create_all` legt nur fehlende Tabellen an. Für Sprint 1
   bewusst so, siehe oben.
 

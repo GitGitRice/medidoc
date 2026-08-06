@@ -3,8 +3,8 @@
 > **Zweck:** Damit Frontend und Backend parallel arbeiten können. Diese Datei ist die
 > verbindliche Form. Ändert sich hier etwas, wird es hier geändert und im Daily gesagt.
 >
-> **Sprache:** JSON-Keys sind englisch, Pfad und Query-Parameter deutsch
-> (`/patienten`, `?suche=`). Siehe [Namensgebung](#namensgebung) unten.
+> **Sprache:** Code und API sind englisch — Pfad, Query-Parameter und JSON-Keys
+> (`/patients`, `?q=`, `first_name`). Siehe [Namensgebung](#namensgebung) unten.
 >
 > Auth-Vertrag: [auth-api.md](./auth-api.md).
 > Rollenmodell: [ADR-0005](./adr/0005-rollen-admin-und-staff.md).
@@ -18,16 +18,16 @@ Basis-URL lokal: `http://localhost:8000`
   Sprint 2 in MongoDB ([ADR-0002](./adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)).
 - **Jeder Endpunkt verlangt einen gültigen Token.** `DELETE` verlangt zusätzlich `admin`.
 - Pflicht sind nur `first_name`, `last_name`, `date_of_birth`. Alles andere darf fehlen.
-- `GET /patienten` liefert **keine nackte Liste**, sondern `{ items, total, limit, offset }`.
+- `GET /patients` liefert **keine nackte Liste**, sondern `{ items, total, limit, offset }`.
 - Jede Fehlerantwort hat dieselbe Form: `status` und `message`.
 
 | Methode | Pfad | Zweck | Erfolg | Verlangt |
 | ------- | ---- | ----- | ------ | -------- |
-| `GET` | `/patienten` | Patientenübersicht, durchsuchbar und seitenweise | `200` | Token |
-| `POST` | `/patienten` | Patient anlegen | `201` | Token |
-| `GET` | `/patienten/{id}` | Stammdaten eines Patienten | `200` | Token |
-| `PATCH` | `/patienten/{id}` | einzelne Felder ändern | `200` | Token |
-| `DELETE` | `/patienten/{id}` | endgültig löschen | `204` | Token + `admin` |
+| `GET` | `/patients` | Patientenübersicht, durchsuchbar und seitenweise | `200` | Token |
+| `POST` | `/patients` | Patient anlegen | `201` | Token |
+| `GET` | `/patients/{id}` | Stammdaten eines Patienten | `200` | Token |
+| `PATCH` | `/patients/{id}` | einzelne Felder ändern | `200` | Token |
+| `DELETE` | `/patients/{id}` | endgültig löschen | `204` | Token + `admin` |
 
 ## Die Stammdaten
 
@@ -58,7 +58,7 @@ solche Fälle bewusst.
 beliebig viele `NULL` zu: Beliebig viele Patienten ohne Nummer sind erlaubt, zwei
 Patienten mit derselben Nummer nicht.
 
-## GET /patienten
+## GET /patients
 
 Die Patientenübersicht. Sortiert nach Nachname, dann Vorname, dann `id` — die `id` am Ende
 macht die Reihenfolge bei Namensgleichheit stabil, sonst springen Zeilen beim Blättern.
@@ -66,13 +66,13 @@ macht die Reihenfolge bei Namensgleichheit stabil, sonst springen Zeilen beim Bl
 **Request**
 
 ```
-GET /patienten?suche=hartmann&limit=25&offset=0
+GET /patients?q=hartmann&limit=25&offset=0
 Authorization: Bearer <token>
 ```
 
 | Parameter | Standard | Hinweis |
 | --------- | -------- | ------- |
-| `suche` | — | filtert nach Vorname, Nachname und Versichertennummer |
+| `q` | — | filtert nach Vorname, Nachname und Versichertennummer |
 | `limit` | `25` | 1–100, darüber `422` |
 | `offset` | `0` | |
 
@@ -110,13 +110,13 @@ Patient später viele Felder hat.
 Seitenzahl und „3 Patienten gefunden". Im Beispiel: drei Treffer, zwei davon abgebildet,
 weil das dritte Ergebnis abgeschnitten wurde.
 
-> **`GET /patienten` liefert eine Seite, nicht alle Datensätze.** Ohne `limit` sind das die
+> **`GET /patients` liefert eine Seite, nicht alle Datensätze.** Ohne `limit` sind das die
 > ersten 25. Wer wirklich alle will, blättert über `offset` — `limit` ist bei 100 gedeckelt,
 > damit ein Tippfehler nicht die ganze Tabelle zieht.
 
 ### Die Suche
 
-`suche` trifft in **Vorname, Nachname oder Versichertennummer**, Groß- und Kleinschreibung
+`q` trifft in **Vorname, Nachname oder Versichertennummer**, Groß- und Kleinschreibung
 egal, Teiltreffer erlaubt.
 
 Mehrere Wörter werden **UND**-verknüpft, jedes einzelne darf in einem beliebigen der drei
@@ -136,7 +136,7 @@ Felder treffen. Die Reihenfolge ist also egal:
 { "items": [], "total": 0, "limit": 25, "offset": 0 }
 ```
 
-`?suche=` ohne Wert verhält sich wie gar kein `suche`.
+`?q=` ohne Wert verhält sich wie gar kein `q`.
 
 `%` und `_` werden maskiert und suchen sich selbst — eine Suche nach `%` liefert keine
 Treffer, nicht alle Patienten.
@@ -149,12 +149,12 @@ findet `Özdemir`), aber `YILMAZ` mit gewöhnlichem `I` findet **nicht** `Yılma
 punktlosem `ı`. Das sind verschiedene Zeichen, und nur eine türkische Collation brächte sie
 zusammen. Für unseren Scope in Ordnung, hier nur festgehalten, damit es niemanden überrascht.
 
-## POST /patienten
+## POST /patients
 
 **Request**
 
 ```json
-POST /patienten
+POST /patients
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -193,7 +193,7 @@ Content-Type: application/json
 Nicht gesetzte Felder kommen als `null` zurück, nicht als fehlender Schlüssel. Das
 Frontend muss also nicht zwischen „nicht da" und „leer" unterscheiden.
 
-## GET /patienten/{id}
+## GET /patients/{id}
 
 Liefert denselben vollständigen Patienten wie `POST`.
 
@@ -217,13 +217,13 @@ Liefert denselben vollständigen Patienten wie `POST`.
 }
 ```
 
-## PATCH /patienten/{id}
+## PATCH /patients/{id}
 
 Ändert **nur die geschickten Felder**. Weggelassene bleiben, wie sie sind — das Formular
 kann ein einzelnes Feld schicken und muss den Patienten nicht zurückspielen.
 
 ```json
-PATCH /patienten/1
+PATCH /patients/1
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -242,7 +242,7 @@ Ein leerer Rumpf `{}` ist erlaubt und ändert nichts.
 `PUT` gibt es nicht. Bei dreizehn Feldern, von denen zehn optional sind, ist ein
 vollständiges Ersetzen die fehleranfälligere Form — ein vergessenes Feld löscht Daten.
 
-## DELETE /patienten/{id}
+## DELETE /patients/{id}
 
 `204`, kein Rumpf. Der Patient ist danach weg — **kein Soft-Delete, kein Papierkorb.**
 
@@ -298,7 +298,7 @@ fasst zusammen und **nennt die Feldnamen**, damit die Meldung auch ohne Auswertu
 `errors` etwas taugt:
 
 ```json
-POST /patienten   { "first_name": "Max" }
+POST /patients   { "first_name": "Max" }
 ```
 
 ```json
@@ -332,12 +332,12 @@ const base = "http://localhost:8000";
 const auth = { Authorization: `Bearer ${token}` };
 
 // Übersicht mit Suche und Blättern
-const params = new URLSearchParams({ suche: suchbegriff, limit: 25, offset: seite * 25 });
-const res = await fetch(`${base}/patienten?${params}`, { headers: auth });
+const params = new URLSearchParams({ q: suchbegriff, limit: 25, offset: seite * 25 });
+const res = await fetch(`${base}/patients?${params}`, { headers: auth });
 const { items, total } = await res.json();
 
 // Einzelnes Feld ändern
-await fetch(`${base}/patienten/${id}`, {
+await fetch(`${base}/patients/${id}`, {
   method: "PATCH",
   headers: { ...auth, "Content-Type": "application/json" },
   body: JSON.stringify({ city: "Hamburg" }),
@@ -360,7 +360,7 @@ Absicherung — durchgesetzt wird im Backend.
 
 200 frei erfundene Patienten liegen als JSON in
 [`backend/testdata/patients.json`](../backend/testdata/patients.json) — dieselbe Form wie
-der Rumpf von `POST /patienten`. **Das Frontend kann die Datei direkt als Mock benutzen.**
+der Rumpf von `POST /patients`. **Das Frontend kann die Datei direkt als Mock benutzen.**
 
 Anlegen aus `backend/`:
 
@@ -405,17 +405,16 @@ Postgres aussagekräftig.
 
 ## Namensgebung
 
-Pfad und Query-Parameter sind deutsch (`/patienten`, `?suche=`), die JSON-Keys englisch
-(`first_name`, `insurance_number`). Das ist eine bewusste Mischung und weicht von der
-Regel in [CONTEXT.md](../CONTEXT.md) ab, nach der die API durchgehend englisch sein sollte.
+Pfad, Query-Parameter und JSON-Keys sind englisch (`/patients`, `?q=`, `first_name`).
+Deutsch sind Kommentare, diese Doku und die Oberfläche im Frontend. Dieselbe Regel steht in
+[auth-api.md](./auth-api.md) und in [ADR-0005](./adr/0005-rollen-admin-und-staff.md).
 
-**Der Stand ist so beschlossen und im Code umgesetzt.** Wer die Regel wiederherstellen
-will, muss `/patienten` → `/patients` und `suche` → `q` ziehen und das Frontend anpassen —
-das ist eine Entscheidung fürs Daily, keine, die nebenbei im Code fällt.
+Zwischenzeitlich standen hier `/patienten` und `?suche=`. Der Weg zurück ist bewusst: eine
+Regel, die für die Hälfte der API gilt, ist keine Regel, und die Mischung hätte bei jedem
+neuen Endpunkt wieder verhandelt werden müssen.
 
-[ADR-0005](./adr/0005-rollen-admin-und-staff.md) nennt weiterhin `/patienten` und ist als
-angenommene Entscheidung nicht nachträglich geändert worden. Insofern deckt sich der Pfad
-mit dem ADR.
+ADR-0005 nennt im Fließtext weiterhin `/patienten`. Eine angenommene Entscheidung wird
+nicht nachträglich umgeschrieben — verbindlich sind der Code und diese Datei.
 
 ## Offene Punkte
 

@@ -139,7 +139,7 @@ def make_patient_fixture(session: Session):
     """Legt einen Patienten direkt in der Datenbank an.
 
     Bewusst an der API vorbei: Ein Test, der seinen Ausgangszustand über
-    `POST /patienten` herstellt, prüft nebenbei immer auch das Anlegen mit —
+    `POST /patients` herstellt, prüft nebenbei immer auch das Anlegen mit —
     und wird rot, wenn dort etwas kaputtgeht, obwohl er von etwas anderem
     handelt.
     """

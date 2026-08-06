@@ -13,7 +13,7 @@ from app.modules.users.models import Role
 
 
 def patient_routes() -> list[tuple[str, str]]:
-    """Jede registrierte `/patienten`-Route als (Methode, Pfad).
+    """Jede registrierte `/patients`-Route als (Methode, Pfad).
 
     Bewusst aus der App gelesen statt von Hand gepflegt: Ein neuer Endpunkt
     landet damit automatisch im Test unten und muss sich absichern.
@@ -25,7 +25,7 @@ def patient_routes() -> list[tuple[str, str]]:
     return [
         (method.upper(), path)
         for path, operations in sorted(app.openapi()["paths"].items())
-        if path.startswith("/patienten")
+        if path.startswith("/patients")
         for method in sorted(operations)
     ]
 
@@ -163,7 +163,7 @@ def test_patient_loeschen_prueft_die_aktuelle_rolle_aus_der_datenbank(
     token_mit_alter_admin_rolle = create_access_token(user.id, Role.ADMIN)
 
     response = client.delete(
-        "/patienten/1",
+        "/patients/1",
         headers={"Authorization": f"Bearer {token_mit_alter_admin_rolle}"},
     )
 
@@ -174,7 +174,7 @@ def test_patient_loeschen_prueft_die_aktuelle_rolle_aus_der_datenbank(
 def test_staff_darf_patienten_lesen(client: TestClient, make_user, auth_headers):
     staff = make_user(role=Role.STAFF)
 
-    response = client.get("/patienten", headers=auth_headers(staff))
+    response = client.get("/patients", headers=auth_headers(staff))
 
     assert response.status_code == 200
 
@@ -183,7 +183,7 @@ def test_admin_darf_patienten_loeschen(client: TestClient, make_user, auth_heade
     admin = make_user(role=Role.ADMIN)
     headers = auth_headers(admin)
     created = client.post(
-        "/patienten",
+        "/patients",
         headers=headers,
         json={
             "first_name": "Max",
@@ -193,7 +193,7 @@ def test_admin_darf_patienten_loeschen(client: TestClient, make_user, auth_heade
     )
 
     response = client.delete(
-        f"/patienten/{created.json()['id']}",
+        f"/patients/{created.json()['id']}",
         headers=headers,
     )
 
