@@ -113,6 +113,25 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
+   * Hat der angemeldete Benutzer eine dieser Rollen?
+   *
+   *     const { hasRole } = useAuth();
+   *     {hasRole("admin") && <button onClick={loeschen}>Löschen</button>}
+   *
+   * Der Helfer steht hier, damit keine Seite `user.role === "admin"` selbst
+   * schreibt: Ohne angemeldeten Benutzer ist die Antwort `false` statt eines
+   * Absturzes an `user.role`, und mehrere Rollen werden als Menge geprüft — wie
+   * `require_roles` im Backend (ADR-0005).
+   *
+   * Ausblenden ist Bedienkomfort, keine Absicherung. Durchgesetzt wird die
+   * Rolle im Backend, siehe docs/auth-api.md.
+   */
+  const hasRole = useCallback(
+    (...roles) => user !== null && roles.includes(user.role),
+    [user],
+  );
+
+  /**
    * Der Weg, auf dem geschützte Endpunkte angesprochen werden.
    *
    * Hängt den Token an und setzt die Regel aus docs/auth-api.md um: `401` heißt
@@ -137,6 +156,7 @@ export function AuthProvider({ children }) {
   const value = useMemo(
     () => ({
       apiFetch,
+      hasRole,
       isLoading,
       login,
       logout,
@@ -147,6 +167,7 @@ export function AuthProvider({ children }) {
     }),
     [
       apiFetch,
+      hasRole,
       isLoading,
       login,
       logout,

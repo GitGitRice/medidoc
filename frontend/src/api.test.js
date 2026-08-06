@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiRequest, getCurrentUser, login } from "./api.js";
+import { ApiError, apiRequest, FORBIDDEN_ERROR, getCurrentUser, login } from "./api.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -70,6 +70,31 @@ describe("Fehlermeldungen", () => {
     await expect(login("", "")).rejects.toMatchObject({
       message: "Die Anfrage ist fehlgeschlagen.",
       status: 422,
+    });
+  });
+
+  it("nennt bei 403 die fehlende Berechtigung", async () => {
+    stubFetch({ detail: "Dazu fehlt dir die Berechtigung" }, { status: 403 });
+
+    await expect(
+      apiRequest("/patients/1", { method: "DELETE" }),
+    ).rejects.toMatchObject({
+      message: "Dazu fehlt dir die Berechtigung",
+      status: 403,
+    });
+  });
+
+  it("nennt sie auch ohne `detail` in der Antwort", async () => {
+    // `detail` ist übergangsweise (docs/auth-api.md) — fällt es weg, darf beim
+    // Benutzer nicht "Die Anfrage ist fehlgeschlagen." stehen. Der Fall ist
+    // immer derselbe: angemeldet, aber die Rolle reicht nicht.
+    stubFetch({ status: 403, message: "Dazu fehlt dir die Berechtigung" }, { status: 403 });
+
+    await expect(
+      apiRequest("/patients/1", { method: "DELETE" }),
+    ).rejects.toMatchObject({
+      message: FORBIDDEN_ERROR,
+      status: 403,
     });
   });
 

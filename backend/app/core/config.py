@@ -32,6 +32,28 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173"
 
+    # Logging und Audit, siehe docs/logging-monitoring.md.
+    log_level: str = "INFO"
+    # Menschenlesbar beim lokalen Entwickeln, JSON im Container — dort liest es
+    # `docker compose logs` und später ein Log-Sammler.
+    log_json: bool = False
+
+    # MongoDB für den Audit-Trail. Leer bedeutet: kein Mongo verfügbar, der
+    # Trail läuft in den Speicher. Die Anwendung startet in beiden Fällen.
+    mongo_url: str = ""
+    mongo_db: str = "medidoc"
+    # Aufbewahrung. Mongo räumt selbst auf (TTL-Index), niemand muss putzen.
+    audit_retention_days: int = 30
+
+    # Schwellen der Missbrauchserkennung. Bewusst als Einstellung und nicht als
+    # Konstante im Code: Beim Vorführen will man sie einmal kleiner drehen.
+    abuse_window_minutes: int = 15
+    abuse_failed_logins_per_email: int = 5
+    abuse_failed_logins_per_ip: int = 10
+    abuse_rejected_tokens_per_ip: int = 10
+    abuse_forbidden_per_user: int = 3
+    abuse_not_found_per_user: int = 20
+
     @property
     def database_url(self) -> str:
         """Built from the POSTGRES_* variables so the password lives in one place only."""

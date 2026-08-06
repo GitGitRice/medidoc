@@ -23,7 +23,7 @@ Rollenänderung keine alten Rechte mitschleppt.
 from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session
 
@@ -46,6 +46,7 @@ def _unauthorized() -> HTTPException:
 
 
 def get_current_user(
+    request: Request,
     token: Annotated[str | None, Depends(oauth2_scheme)],
     session: Session = Depends(get_session),
 ) -> User:
@@ -70,6 +71,11 @@ def get_current_user(
     user = users_service.get_by_id(session, user_id)
     if user is None or not user.is_active:
         raise _unauthorized()
+
+    # Damit Logzeile und Audit-Ereignis wissen, wer den Request gestellt hat.
+    # Die Middleware liest das hier ab; sie läuft, bevor es einen Benutzer gibt,
+    # und käme sonst nicht an ihn heran (app/core/middleware.py).
+    request.state.user_id = user.id
 
     return user
 
