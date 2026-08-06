@@ -38,6 +38,12 @@ class EventType(StrEnum):
     PATIENT_UPDATED = "patient_updated"
     PATIENT_DELETED = "patient_deleted"
 
+    # Dokumente. Der Dateiname wird bewusst **nicht** mitgeschrieben — er heißt
+    # in der Praxis gern "Mueller_Befund.pdf" und wäre damit genau die
+    # Patientenangabe, die hier nicht hingehört.
+    DOCUMENT_UPLOADED = "document_uploaded"
+    DOCUMENT_DELETED = "document_deleted"
+
     # Zugriff auf eine ID, die es nicht gibt. Einzeln harmlos, gehäuft der
     # Fingerabdruck einer ID-Enumeration.
     NOT_FOUND = "not_found"
@@ -59,6 +65,8 @@ _INFO_EVENTS = frozenset(
         EventType.PATIENT_CREATED,
         EventType.PATIENT_UPDATED,
         EventType.PATIENT_DELETED,
+        EventType.DOCUMENT_UPLOADED,
+        EventType.DOCUMENT_DELETED,
     }
 )
 
