@@ -87,6 +87,11 @@ Danach sind das Frontend unter <http://localhost:5173>, die API unter
 <http://localhost:8000/docs> erreichbar. Änderungen an Frontend und Backend werden
 von den Entwicklungsservern automatisch übernommen.
 
+PostgreSQL speichert die Patientenstammdaten im Volume `postgres_data`. MongoDB legt
+Dokument-Metadaten im Volume `mongo_data` ab; die eigentlichen Anhänge liegen getrennt
+im Volume `document_attachments`. `docker compose down` behält diese Daten, während
+`docker compose down -v` alle drei Volumes und deren Inhalte löscht.
+
 ## Projektstruktur
 
 ```
