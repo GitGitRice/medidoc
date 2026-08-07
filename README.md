@@ -92,6 +92,12 @@ Dokument-Metadaten im Volume `mongo_data` ab; die eigentlichen Anhänge liegen g
 im Volume `document_attachments`. `docker compose down` behält diese Daten, während
 `docker compose down -v` alle drei Volumes und deren Inhalte löscht.
 
+## AWS-Demo
+
+Zusätzlich zum lokalen Compose-Stack läuft MediDoc für die Projektvorführung auf AWS
+EC2. Architektur, öffentliche Adressen, Einrichtung und Betrieb stehen in der
+[AWS-Deployment-Dokumentation](./docs/aws-deployment.md).
+
 ## Projektstruktur
 
 ```
