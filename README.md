@@ -56,12 +56,38 @@ ist also kein falsches Ziel. Für alles außerhalb der Auth-Strecke bleibt es be
 Backend und Frontend haben je eine eigene Suite. Beide laufen ohne Docker und ohne
 Datenbank — das Backend gegen SQLite im Speicher, das Frontend gegen jsdom.
 [GitHub Actions](./.github/workflows/ci.yml) startet sie bei jedem Push und jedem
-Pull Request.
+Pull Request — und bei Bedarf von Hand.
 
 ```bash
 cd backend  && pytest -q
 cd frontend && npm test
 ```
+
+### CI neu anstoßen
+
+Manchmal fehlen die Checks an einem Pull Request komplett. Der häufigste Grund: Ein
+Force-Push lässt den Pull Request auf einem Commit stehen, für den nie ein Lauf
+angelegt wurde. Dann gibt es auch nichts zum Neustarten — der Lauf muss neu erzeugt
+werden.
+
+| Situation | Befehl |
+| --------- | ------ |
+| Ein Lauf existiert, soll noch mal laufen | `gh run rerun <id>` — nur die roten Jobs mit `--failed` |
+| Für den Commit existiert kein Lauf | `gh workflow run ci.yml --ref <branch>` |
+| Geht immer, ohne Voraussetzung | `gh pr close <nr> && gh pr reopen <nr>` |
+
+Die Lauf-ID findet man über `gh run list --branch <branch>`.
+
+Zwei Fallstricke bei `gh workflow run`: Ob der Workflow von Hand startbar ist, prüft
+GitHub am Standard-Branch — ausgeführt wird aber die `ci.yml` **des angegebenen
+Branches**. Ein Branch, der vor dieser Änderung abgezweigt wurde, kennt
+`workflow_dispatch` noch nicht; dort vorher `develop` hereinmergen. Und ob der Lauf am
+Pull Request als Check auftaucht, sollte man beim ersten Mal wirklich nachsehen: Er
+läuft auf dem Head-Commit des Branches und sollte deshalb dort landen — bestätigt ist
+das noch nicht.
+
+Close und Reopen ist deshalb der verlässliche Weg, wenn es nur darum geht, die Checks
+an einem Pull Request nachzuholen.
 
 ## Scope
 
