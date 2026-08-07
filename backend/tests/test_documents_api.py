@@ -547,6 +547,66 @@ class TestLoeschen:
         assert client.get(f"{BASE}/{patient.id}", headers=staff_headers).json()["total"] == 1
 
 
+class TestPatientGeloescht:
+    """Die Akte geht mit dem Patienten."""
+
+    def test_dokumente_verschwinden_mit_dem_patienten(
+        self, client: TestClient, admin_headers, make_patient, documents
+    ):
+        """Sonst blieben sie unerreichbar in der Datenbank stehen."""
+        patient = make_patient()
+        hochladen(client, admin_headers, patient.id, title="Eins")
+        hochladen(client, admin_headers, patient.id, title="Zwei")
+
+        client.delete(f"/patients/{patient.id}", headers=admin_headers)
+
+        assert documents.search(patient.id, None, 100, 0) == ([], 0)
+
+    def test_die_dateien_verschwinden_mit(
+        self, client: TestClient, admin_headers, make_patient, upload_dir
+    ):
+        patient = make_patient()
+        hochladen(client, admin_headers, patient.id)
+
+        client.delete(f"/patients/{patient.id}", headers=admin_headers)
+
+        assert not (upload_dir / str(patient.id)).exists()
+
+    def test_andere_patienten_bleiben_unberuehrt(
+        self, client: TestClient, admin_headers, make_patient, upload_dir
+    ):
+        einer = make_patient(first_name="Max")
+        anderer = make_patient(first_name="Erika")
+        hochladen(client, admin_headers, einer.id)
+        hochladen(client, admin_headers, anderer.id)
+
+        client.delete(f"/patients/{einer.id}", headers=admin_headers)
+
+        assert client.get(f"{BASE}/{anderer.id}", headers=admin_headers).json()["total"] == 1
+        assert (upload_dir / str(anderer.id)).exists()
+
+    def test_die_anzahl_steht_im_audit_trail(
+        self, client: TestClient, admin_headers, make_patient, audit_store
+    ):
+        patient = make_patient()
+        hochladen(client, admin_headers, patient.id, title="Eins")
+        hochladen(client, admin_headers, patient.id, title="Zwei")
+
+        client.delete(f"/patients/{patient.id}", headers=admin_headers)
+
+        treffer = [
+            e for e in audit_store.recent(500) if e["event"] == EventType.PATIENT_DELETED
+        ]
+        assert treffer[0]["detail"]["documents_removed"] == 2
+
+    def test_patient_ohne_dokumente_laesst_sich_normal_loeschen(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+
+        assert client.delete(f"/patients/{patient.id}", headers=admin_headers).status_code == 204
+
+
 class TestAuditTrail:
     """Uploads und Löschungen sind nachvollziehbar — ohne Patientendaten."""
 

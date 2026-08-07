@@ -39,7 +39,6 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from sqlmodel import Session
 
-from app.core.config import settings
 from app.core.errors import ErrorResponse
 from app.db.session import get_session
 from app.modules.audit import service as audit
@@ -112,19 +111,19 @@ def upload_document(
     metadata = _metadata(title, description, tags, source)
 
     try:
-        dokument = service.create(
+        document = service.create(
             patient_id=patient_id,
             metadata=metadata,
-            quelle=file.file,
+            stream=file.file,
             filename=file.filename,
             content_type=file.content_type,
             uploaded_by=request.state.user_id,
         )
-    except FileTooLarge as zu_gross:
+    except FileTooLarge as too_large:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=(
-                f"Die Datei ist größer als {_megabytes(zu_gross.limit_bytes)} MB "
+                f"Die Datei ist größer als {_megabytes(too_large.limit_bytes)} MB "
                 "und wurde nicht gespeichert"
             ),
         ) from None
@@ -139,18 +138,18 @@ def upload_document(
         request=request,
         status=status.HTTP_201_CREATED,
         user_id=request.state.user_id,
-        target=f"document:{dokument.id}",
+        target=f"document:{document.id}",
         # Kein Dateiname und kein Titel — beide tragen in der Praxis
         # Patientennamen. Größe und Typ sagen genug, um einen Vorfall
         # einzuordnen.
         detail={
             "patient": f"patient:{patient_id}",
-            "size_bytes": dokument.size_bytes,
-            "content_type": dokument.content_type,
+            "size_bytes": document.size_bytes,
+            "content_type": document.content_type,
         },
     )
 
-    return dokument
+    return document
 
 
 @router.get(
@@ -234,14 +233,14 @@ def _metadata(
             tags=parse_tags(tags),
             source=source,
         )
-    except ValidationError as ungueltig:
+    except ValidationError as invalid:
         # `("title",)` wird zu `("body", "title")`, damit der Feldname in der
         # Antwort genauso heißt wie das Formularfeld.
-        fehler = [
-            {**einzeln, "loc": ("body", *einzeln.get("loc", ()))}
-            for einzeln in ungueltig.errors()
+        errors = [
+            {**error, "loc": ("body", *error.get("loc", ()))}
+            for error in invalid.errors()
         ]
-        raise RequestValidationError(fehler) from None
+        raise RequestValidationError(errors) from None
 
 
 def _patient_or_404(session: Session, patient_id: int) -> None:

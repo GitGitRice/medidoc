@@ -16,23 +16,23 @@ from typing import Any, Protocol
 COLLECTION = "documents"
 
 
-def _such_filter(patient_id: int, q: str | None) -> dict[str, Any]:
+def _search_filter(patient_id: int, q: str | None) -> dict[str, Any]:
     """Der Filter für Liste und Zählung — für beide derselbe.
 
     `q` trifft in Titel **oder** Beschreibung, Groß- und Kleinschreibung egal.
     `re.escape` ist hier nicht Kosmetik: Ohne das wäre eine Suche nach `.*` ein
     Ausdruck, der alles findet, und eine nach `(` ein Fehler.
     """
-    filter_: dict[str, Any] = {"patient_id": patient_id}
+    query: dict[str, Any] = {"patient_id": patient_id}
 
     if q and q.strip():
-        muster = re.escape(q.strip())
-        filter_["$or"] = [
-            {"title": {"$regex": muster, "$options": "i"}},
-            {"description": {"$regex": muster, "$options": "i"}},
+        pattern = re.escape(q.strip())
+        query["$or"] = [
+            {"title": {"$regex": pattern, "$options": "i"}},
+            {"description": {"$regex": pattern, "$options": "i"}},
         ]
 
-    return filter_
+    return query
 
 
 class DocumentStore(Protocol):
@@ -47,7 +47,8 @@ class DocumentStore(Protocol):
     def delete(self, patient_id: int, document_id: str) -> bool:
         """`True`, wenn wirklich etwas gelöscht wurde."""
 
-    def list_paths(self, patient_id: int) -> list[str]: ...
+    def delete_for_patient(self, patient_id: int) -> int:
+        """Entfernt alle Dokumente eines Patienten, gibt die Anzahl zurück."""
 
 
 class MemoryDocumentStore:
@@ -60,46 +61,48 @@ class MemoryDocumentStore:
         self._documents.append(dict(document))
 
     def get(self, patient_id: int, document_id: str) -> dict[str, Any] | None:
-        for dokument in self._documents:
-            if dokument["_id"] == document_id and dokument["patient_id"] == patient_id:
-                return dict(dokument)
+        for document in self._documents:
+            if document["_id"] == document_id and document["patient_id"] == patient_id:
+                return dict(document)
         return None
 
     def search(
         self, patient_id: int, q: str | None, limit: int, offset: int
     ) -> tuple[list[dict[str, Any]], int]:
-        begriff = (q or "").strip().lower()
+        term = (q or "").strip().lower()
 
-        treffer = [
-            dokument
-            for dokument in self._documents
-            if dokument["patient_id"] == patient_id
+        matches = [
+            document
+            for document in self._documents
+            if document["patient_id"] == patient_id
             and (
-                not begriff
-                or begriff in dokument["title"].lower()
-                or begriff in (dokument.get("description") or "").lower()
+                not term
+                or term in document["title"].lower()
+                or term in (document.get("description") or "").lower()
             )
         ]
         # Neueste zuerst, `_id` als Stichentscheid — sonst wechselte die
         # Reihenfolge bei gleichem Zeitstempel und das Blättern zeigte
         # Dokumente doppelt.
-        treffer.sort(key=lambda d: (d["created_at"], d["_id"]), reverse=True)
+        matches.sort(key=lambda d: (d["created_at"], d["_id"]), reverse=True)
 
-        return [dict(d) for d in treffer[offset : offset + limit]], len(treffer)
+        return [dict(d) for d in matches[offset : offset + limit]], len(matches)
 
     def delete(self, patient_id: int, document_id: str) -> bool:
-        vorher = len(self._documents)
+        before = len(self._documents)
         self._documents = [
             d
             for d in self._documents
             if not (d["_id"] == document_id and d["patient_id"] == patient_id)
         ]
-        return len(self._documents) < vorher
+        return len(self._documents) < before
 
-    def list_paths(self, patient_id: int) -> list[str]:
-        return [
-            d["stored_as"] for d in self._documents if d["patient_id"] == patient_id
+    def delete_for_patient(self, patient_id: int) -> int:
+        before = len(self._documents)
+        self._documents = [
+            d for d in self._documents if d["patient_id"] != patient_id
         ]
+        return before - len(self._documents)
 
 
 class MongoDocumentStore:
@@ -120,8 +123,8 @@ class MongoDocumentStore:
     def ensure_indexes(self) -> None:
         """Legt die Indizes an. Verträgt Wiederholung.
 
-        Ohne den ersten Index läse jede Dokumentenliste die ganze Collection —
-        also auch die Dokumente aller anderen Patienten.
+        Ohne diesen Index läse jede Dokumentenliste die ganze Collection — also
+        auch die Dokumente aller anderen Patienten.
         """
         self._collection.create_index(
             [("patient_id", self._ascending), ("created_at", self._descending)],
@@ -137,28 +140,25 @@ class MongoDocumentStore:
     def search(
         self, patient_id: int, q: str | None, limit: int, offset: int
     ) -> tuple[list[dict[str, Any]], int]:
-        filter_ = _such_filter(patient_id, q)
+        query = _search_filter(patient_id, q)
 
-        treffer = (
-            self._collection.find(filter_)
+        matches = (
+            self._collection.find(query)
             .sort([("created_at", self._descending), ("_id", self._descending)])
             .skip(offset)
             .limit(limit)
         )
 
-        return list(treffer), self._collection.count_documents(filter_)
+        return list(matches), self._collection.count_documents(query)
 
     def delete(self, patient_id: int, document_id: str) -> bool:
-        ergebnis = self._collection.delete_one(
+        result = self._collection.delete_one(
             {"_id": document_id, "patient_id": patient_id}
         )
-        return ergebnis.deleted_count > 0
+        return result.deleted_count > 0
 
-    def list_paths(self, patient_id: int) -> list[str]:
-        return [
-            d["stored_as"]
-            for d in self._collection.find({"patient_id": patient_id}, {"stored_as": 1})
-        ]
+    def delete_for_patient(self, patient_id: int) -> int:
+        return self._collection.delete_many({"patient_id": patient_id}).deleted_count
 
 
 _store: DocumentStore | None = None

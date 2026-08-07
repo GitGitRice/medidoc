@@ -19,7 +19,7 @@ MAX_TAG_LENGTH = 40
 MAX_TAGS = 20
 
 
-def parse_tags(roh: str | None) -> list[str]:
+def parse_tags(raw: str | None) -> list[str]:
     """`"MRT, radiologie ,, mrt"` wird zu `["mrt", "radiologie"]`.
 
     Kleingeschrieben und ohne Dubletten, damit `MRT` und `mrt` beim Filtern
@@ -27,16 +27,16 @@ def parse_tags(roh: str | None) -> list[str]:
     Nennung bleibt erhalten — `dict.fromkeys` statt `set`, sonst wechselte die
     Reihenfolge bei jedem Aufruf und die Liste im Frontend flackerte.
     """
-    if not roh:
+    if not raw:
         return []
 
-    sauber = []
-    for teil in roh.split(","):
-        tag = teil.strip().lower()
+    cleaned = []
+    for part in raw.split(","):
+        tag = part.strip().lower()
         if tag:
-            sauber.append(tag[:MAX_TAG_LENGTH])
+            cleaned.append(tag[:MAX_TAG_LENGTH])
 
-    return list(dict.fromkeys(sauber))[:MAX_TAGS]
+    return list(dict.fromkeys(cleaned))[:MAX_TAGS]
 
 
 class DocumentPublic(BaseModel):
@@ -86,21 +86,21 @@ class DocumentMetadata(BaseModel):
 
     @field_validator("title")
     @classmethod
-    def _title_nicht_leer(cls, wert: str) -> str:
-        sauber = wert.strip()
-        if not sauber:
+    def _title_not_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
             raise ValueError("darf nicht leer sein")
-        return sauber
+        return cleaned
 
     @field_validator("description", "source")
     @classmethod
-    def _leerer_text_ist_nichts(cls, wert: str | None) -> str | None:
+    def _blank_becomes_none(cls, value: str | None) -> str | None:
         """`""` und `"   "` bedeuten dasselbe wie „nicht angegeben".
 
         Ohne das käme aus einem leeren Formularfeld ein leerer String statt
         `null`, und das Frontend müsste beides unterscheiden.
         """
-        if wert is None:
+        if value is None:
             return None
-        sauber = wert.strip()
-        return sauber or None
+        cleaned = value.strip()
+        return cleaned or None

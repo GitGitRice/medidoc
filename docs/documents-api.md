@@ -22,6 +22,38 @@ Basis-URL lokal: `http://localhost:8000`
 | `GET` | `/docs/{patient_id}?q=&limit=&offset=` | Dokumente auflisten | `200` | Token |
 | `DELETE` | `/docs/{patient_id}/{document_id}` | Dokument löschen | `204` | Token + `admin` |
 
+## ⚠ Offen: Heißt das hier Dokument oder Anhang?
+
+**Dieser Endpunkt widerspricht [CONTEXT.md](../CONTEXT.md). Das muss im Daily entschieden
+werden, bevor es in die Präsentation geht.**
+
+CONTEXT.md und [ADR-0001](./adr/0001-patientenakte-statt-dokumentenverwaltung.md) sagen:
+
+> Ein **Dokument** besteht aus strukturierten Angaben, deren Felder vom **Dokumenttyp**
+> abhängen, und optional aus einem **Anhang**. Ein Dokument ohne Anhang ist gültig.
+
+Was dieser Branch baut, ist das Gegenteil:
+
+| | CONTEXT.md | dieser Code |
+| - | ---------- | ----------- |
+| Dokumenttyp | bestimmt die Felder | gibt es nicht |
+| Anhang | optional | **Pflicht** — ohne Datei `422` |
+| Felder | je nach Typ | für alle gleich (`title`, `description`, `tags`, `source`) |
+
+Der Code baut also einen **Anhang** und nennt ihn **Dokument**.
+
+Zwei Wege, beide in Ordnung — aber nur einer:
+
+1. **Wir behalten dieses Modell.** Dann wird CONTEXT.md geändert: „Dokument" ist dann eine
+   Datei mit Angaben, „Dokumenttyp" fällt weg oder wird zu einem Tag. ADR-0001 bekommt
+   einen Nachtrag.
+2. **Wir behalten CONTEXT.md.** Dann ist dieser Endpunkt der **Anhang**-Teil eines
+   Dokuments. Der Dokumenttyp und die typabhängigen Felder kommen später dazu, und die
+   Pfade und Schemas hier heißen entsprechend um.
+
+Das Wort steht in ADR-0001, in CONTEXT.md und in der Abschlusspräsentation — deshalb ist
+es keine Frage, die nebenbei im Code entschieden wird.
+
 ## Wo was liegt
 
 Drei Speicher, jeder für das, was er kann ([ADR-0002](./adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)):
@@ -56,8 +88,8 @@ Pflicht sind nur **`title` und die Datei**. Alles andere darf fehlen.
 Anforderung, sind aber mit drin: Eine Dateiliste, die weder Dateinamen noch Größe zeigt,
 lässt sich im Frontend nicht bedienen.
 
-Nicht ausgeliefert werden `stored_as` (der Speicherort), `sha256` und `uploaded_by`. Der
-Ablageort geht von außen niemanden etwas an.
+Nicht ausgeliefert werden `stored_as` (der Speicherort) und `uploaded_by`. Der Ablageort
+geht von außen niemanden etwas an.
 
 ### `tags`
 
@@ -181,6 +213,15 @@ anderen Patienten löschen — das ergibt `404`, und das Dokument bleibt heil.
 
 Zweimaliges Löschen ist kein Serverfehler: Der zweite Aufruf antwortet mit `404`.
 
+### Wird der Patient gelöscht, geht die Akte mit
+
+`DELETE /patients/{id}` entfernt seither auch **alle Dokumente und Dateien** dieses
+Patienten. Ohne das blieben sie liegen: über die API nicht mehr erreichbar, weil jeder
+Dokument-Endpunkt den Patienten voraussetzt, und trotzdem auf der Platte.
+
+Wie viele Dokumente dabei weggeräumt wurden, steht im Audit-Trail am Ereignis
+`patient_deleted` unter `detail.documents_removed`.
+
 ## Fehler
 
 Dieselbe Form wie überall (`status`, `message`), siehe
@@ -230,6 +271,8 @@ Festgehalten werden Größe und Typ; die sagen genug, um einen Vorfall einzuordn
 
 ## Offene Punkte
 
+- **Dokument oder Anhang** — der Widerspruch zu CONTEXT.md, siehe
+  [oben](#-offen-heißt-das-hier-dokument-oder-anhang). **Fürs nächste Daily.**
 - **Es gibt keinen Download.** Die Anforderung nennt Hochladen, Auflisten und Löschen — die
   Bytes sind damit vorerst nur ablegbar, nicht wieder abrufbar. Ein
   `GET /docs/{patient_id}/{document_id}/file` wäre der nächste Schritt und ist klein; er

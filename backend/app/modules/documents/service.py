@@ -30,7 +30,7 @@ DEFAULT_LIMIT = 100
 def create(
     patient_id: int,
     metadata: DocumentMetadata,
-    quelle: BinaryIO,
+    stream: BinaryIO,
     filename: str | None,
     content_type: str | None,
     uploaded_by: int | None = None,
@@ -39,15 +39,15 @@ def create(
     document_id = uuid4().hex
     storage = get_storage()
 
-    gespeichert = storage.save(
-        quelle,
+    stored = storage.save(
+        stream,
         patient_id=patient_id,
         document_id=document_id,
         filename=filename,
         limit_bytes=settings.max_upload_bytes,
     )
 
-    dokument: dict[str, Any] = {
+    document: dict[str, Any] = {
         "_id": document_id,
         "patient_id": patient_id,
         "title": metadata.title,
@@ -58,25 +58,24 @@ def create(
         # Der Name des Aufrufers — als Angabe, nie als Pfad (siehe storage.py).
         "filename": filename or f"{document_id}.bin",
         "content_type": content_type,
-        "size_bytes": gespeichert.size_bytes,
-        "sha256": gespeichert.sha256,
-        "stored_as": gespeichert.relative_path,
+        "size_bytes": stored.size_bytes,
+        "stored_as": stored.relative_path,
         "uploaded_by": uploaded_by,
     }
 
     try:
-        get_store().insert(dokument)
+        get_store().insert(document)
     except Exception:
         # Ohne das bliebe eine Datei liegen, zu der es kein Dokument gibt —
         # unsichtbar, unlöschbar über die API, und sie belegt den Platz.
-        storage.delete(gespeichert.relative_path)
+        storage.delete(stored.relative_path)
         log.warning(
             "documents: Metadaten nicht geschrieben, Datei zurückgenommen",
             extra={"patient_id": patient_id},
         )
         raise
 
-    return to_public(dokument)
+    return to_public(document)
 
 
 def search(
@@ -89,14 +88,8 @@ def search(
     limit = max(1, min(limit, MAX_LIMIT))
     offset = max(0, offset)
 
-    treffer, gesamt = get_store().search(patient_id, q, limit, offset)
-    return [to_public(d) for d in treffer], gesamt
-
-
-def get(patient_id: int, document_id: str) -> DocumentPublic | None:
-    """Ein Dokument, sofern es zu diesem Patienten gehört."""
-    dokument = get_store().get(patient_id, document_id)
-    return to_public(dokument) if dokument else None
+    matches, total = get_store().search(patient_id, q, limit, offset)
+    return [to_public(d) for d in matches], total
 
 
 def delete(patient_id: int, document_id: str) -> bool:
@@ -106,31 +99,44 @@ def delete(patient_id: int, document_id: str) -> bool:
     bei einem Abbruch dazwischen ein Dokument stehen, dessen Datei fehlt — und
     das sieht in der Liste aus wie ein heiles.
     """
-    dokument = get_store().get(patient_id, document_id)
-    if dokument is None:
+    store = get_store()
+
+    document = store.get(patient_id, document_id)
+    if document is None:
         return False
 
-    get_store().delete(patient_id, document_id)
-    get_storage().delete(dokument["stored_as"])
+    store.delete(patient_id, document_id)
+    get_storage().delete(document["stored_as"])
     return True
 
 
-def to_public(dokument: dict[str, Any]) -> DocumentPublic:
+def delete_for_patient(patient_id: int) -> int:
+    """Räumt alle Dokumente eines Patienten ab. Gibt die Anzahl zurück.
+
+    Wird beim Löschen eines Patienten aufgerufen. Ohne das blieben Metadaten
+    und Dateien liegen: über die API nicht mehr erreichbar, weil jeder Endpunkt
+    den Patienten voraussetzt, und trotzdem auf der Platte.
+    """
+    removed = get_store().delete_for_patient(patient_id)
+    get_storage().delete_patient_folder(patient_id)
+    return removed
+
+
+def to_public(document: dict[str, Any]) -> DocumentPublic:
     """Aus dem gespeicherten Dokument wird die Form für die API.
 
-    `sha256`, `stored_as` und `uploaded_by` bleiben drinnen: Der Speicherort
-    geht niemanden von außen etwas an, und die Prüfsumme beantwortet keine
-    Frage, die im Frontend gestellt wird.
+    `stored_as` und `uploaded_by` bleiben drinnen: Der Speicherort geht
+    niemanden von außen etwas an.
     """
     return DocumentPublic(
-        id=dokument["_id"],
-        patient_id=dokument["patient_id"],
-        title=dokument["title"],
-        description=dokument.get("description"),
-        tags=dokument.get("tags", []),
-        source=dokument.get("source"),
-        filename=dokument["filename"],
-        content_type=dokument.get("content_type"),
-        size_bytes=dokument["size_bytes"],
-        created_at=dokument["created_at"],
+        id=document["_id"],
+        patient_id=document["patient_id"],
+        title=document["title"],
+        description=document.get("description"),
+        tags=document.get("tags", []),
+        source=document.get("source"),
+        filename=document["filename"],
+        content_type=document.get("content_type"),
+        size_bytes=document["size_bytes"],
+        created_at=document["created_at"],
     )

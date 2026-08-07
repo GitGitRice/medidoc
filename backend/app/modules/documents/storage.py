@@ -17,7 +17,6 @@ Speicher landet. Stattdessen wird in Blöcken gelesen und beim Überschreiten
 sofort abgebrochen.
 """
 
-import hashlib
 import logging
 import re
 import shutil
@@ -53,7 +52,6 @@ class StoredFile:
 
     relative_path: str
     size_bytes: int
-    sha256: str
 
 
 def safe_suffix(filename: str | None) -> str:
@@ -77,49 +75,46 @@ class FileStorage:
 
     def save(
         self,
-        quelle: BinaryIO,
+        stream: BinaryIO,
         patient_id: int,
         document_id: str,
         filename: str | None,
         limit_bytes: int,
     ) -> StoredFile:
-        """Schreibt die Datei und gibt Größe und Prüfsumme zurück.
+        """Schreibt die Datei und gibt Pfad und Größe zurück.
 
         Wirft `FileTooLarge` oder `EmptyFile` — und lässt in beiden Fällen
         nichts Halbes liegen.
         """
-        ordner = self.root / str(patient_id)
-        ordner.mkdir(parents=True, exist_ok=True)
+        folder = self.root / str(patient_id)
+        folder.mkdir(parents=True, exist_ok=True)
 
-        ziel = ordner / f"{document_id}{safe_suffix(filename)}"
+        target = folder / f"{document_id}{safe_suffix(filename)}"
         # Erst unter einem Arbeitsnamen schreiben: Bricht der Upload ab, liegt
         # keine halbe Datei da, die wie eine ganze aussieht.
-        arbeitsdatei = ziel.with_name(ziel.name + ".part")
+        partial = target.with_name(target.name + ".part")
 
-        pruefsumme = hashlib.sha256()
-        groesse = 0
+        size = 0
 
         try:
-            with arbeitsdatei.open("wb") as senke:
-                while block := quelle.read(CHUNK_SIZE):
-                    groesse += len(block)
-                    if groesse > limit_bytes:
+            with partial.open("wb") as sink:
+                while chunk := stream.read(CHUNK_SIZE):
+                    size += len(chunk)
+                    if size > limit_bytes:
                         raise FileTooLarge(limit_bytes)
-                    pruefsumme.update(block)
-                    senke.write(block)
+                    sink.write(chunk)
 
-            if groesse == 0:
+            if size == 0:
                 raise EmptyFile
 
-            arbeitsdatei.replace(ziel)
+            partial.replace(target)
         except BaseException:
-            arbeitsdatei.unlink(missing_ok=True)
+            partial.unlink(missing_ok=True)
             raise
 
         return StoredFile(
-            relative_path=str(ziel.relative_to(self.root)),
-            size_bytes=groesse,
-            sha256=pruefsumme.hexdigest(),
+            relative_path=str(target.relative_to(self.root)),
+            size_bytes=size,
         )
 
     def delete(self, relative_path: str) -> None:
@@ -139,7 +134,11 @@ class FileStorage:
             )
 
     def delete_patient_folder(self, patient_id: int) -> None:
-        """Räumt den Ordner eines Patienten ab. Für Aufräumarbeiten."""
+        """Räumt den Ordner eines Patienten samt Inhalt ab.
+
+        Wird beim Löschen eines Patienten gebraucht: Ohne das blieben seine
+        Dateien liegen, unerreichbar und trotzdem auf der Platte.
+        """
         shutil.rmtree(self.root / str(patient_id), ignore_errors=True)
 
 

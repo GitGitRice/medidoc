@@ -37,6 +37,7 @@ from app.db.session import get_session
 from app.modules.audit import service as audit
 from app.modules.audit.events import EventType
 from app.modules.auth.dependencies import get_current_user, require_roles
+from app.modules.documents import service as documents_service
 from app.modules.patients import service
 from app.modules.patients.models import Patient
 from app.modules.patients.schemas import (
@@ -148,17 +149,17 @@ def update_patient(
     """
     patient = _get_or_404(session, patient_id)
     _reject_taken_insurance_number(session, data.insurance_number, exclude_id=patient_id)
-    geaendert = service.update(session, patient, data)
+    updated = service.update(session, patient, data)
     # Welche Felder angefasst wurden, nicht womit sie gefüllt wurden — der
     # Trail hält keine Patientendaten.
     _audit(
         request,
         EventType.PATIENT_UPDATED,
-        geaendert,
+        updated,
         status.HTTP_200_OK,
         fields=sorted(data.model_dump(exclude_unset=True)),
     )
-    return geaendert
+    return updated
 
 
 @router.delete(
@@ -177,9 +178,24 @@ def delete_patient(
     """
     patient = _get_or_404(session, patient_id)
     service.delete(session, patient)
+
+    # Die Akte geht mit. Ohne das blieben Dokumente und Dateien liegen: über
+    # die API nicht mehr erreichbar, weil jeder Dokument-Endpunkt den Patienten
+    # voraussetzt, und trotzdem auf der Platte. Zuerst der Patient, dann die
+    # Akte — bricht es dazwischen ab, bleiben verwaiste Dateien statt eines
+    # Patienten ohne seine Dokumente.
+    removed_documents = documents_service.delete_for_patient(patient_id)
+
     # Nach dem Löschen protokolliert: Der Eintrag im Trail ist ab jetzt der
     # einzige Beleg, dass es diesen Patienten je gab.
-    _audit(request, EventType.PATIENT_DELETED, None, status.HTTP_204_NO_CONTENT, patient_id=patient_id)
+    _audit(
+        request,
+        EventType.PATIENT_DELETED,
+        None,
+        status.HTTP_204_NO_CONTENT,
+        patient_id=patient_id,
+        documents_removed=removed_documents,
+    )
 
 
 def _audit(
@@ -195,13 +211,13 @@ def _audit(
     Nur die Kennung, nie Name, Geburtsdatum oder Versichertennummer — der Trail
     liegt dauerhaft in einer eigenen Datenbank, siehe `audit/events.py`.
     """
-    kennung = patient.id if patient is not None else patient_id
+    identifier = patient.id if patient is not None else patient_id
     audit.record(
         event,
         request=request,
         status=status_code,
         user_id=request.state.user_id,
-        target=f"patient:{kennung}",
+        target=f"patient:{identifier}",
         detail=detail,
     )
 
