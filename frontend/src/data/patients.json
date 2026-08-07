@@ -8,5 +8,20 @@
     "id": 2,
     "name": "Erika Musterfrau",
     "birthDate": "1992-11-03"
+  },
+  {
+    "id": 3,
+    "name": "Lena Koch",
+    "birthDate": "1992-11-03"
+  },
+  {
+    "id": 4,
+    "name": "Christian Bauer",
+    "birthDate": "1976-05-25"
+  },
+  {
+    "id": 5,
+    "name": "Sophie Hoffmann",
+    "birthDate": "2002-04-27"
   }
 ]

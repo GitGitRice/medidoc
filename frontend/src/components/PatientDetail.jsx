@@ -1,6 +1,11 @@
-export function PatientDetailPage( patient) {
+export function PatientDetailPage( patient ) {
   return (
-        <h2>Patientendetails</h2>
-        
+    <div>
+        <h3>Patientendetails</h3>
+        <p></p>
+        <h1>{patient.name}</h1>
+        <p></p>
+        <p>{patient.birthdate} </p>
+    </div>
   );
 }

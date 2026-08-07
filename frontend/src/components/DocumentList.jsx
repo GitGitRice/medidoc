@@ -25,8 +25,8 @@ import DocumentCard from '../components/DocumentCard';
 // items ist das Array mit allen Items
 // onDelete und onToggleFavorite sind Callback-Funktionen
 // die wir an ItemCard weiterreichen
-function DocumentList({ documents, searchTextdocuments, searchTagdocuments, error, onDelete, onToggleFavorite, editingId,
-  onStartEdit, onCancelEdit, onUpdatedocument}) {
+function DocumentList({ documents, searchTextdocuments, searchTagDocuments, error, onDelete, onToggleFavorite, editingId,
+  onStartEdit, onCancelEdit, onUpdateDocument}) {
   // Conditional Rendering: wenn keine Items vorhanden sind
   // zeigen wir einen Empty-State statt einer leeren Liste
   // das ist bessere UX weil der User Feedback bekommt
@@ -37,9 +37,9 @@ function DocumentList({ documents, searchTextdocuments, searchTagdocuments, erro
     return (
       <div className="empty-state">
         <div className="empty-state-icon">📚</div>
-        <h3 className="empty-state-title">Keine eigenen Bücher vorhanden</h3>
+        <h3 className="empty-state-title">Keine eigenen Dokumente vorhanden</h3>
         <p className="empty-state-text">
-          Füge dein erstes Buch hinzu, um loszulegen!
+          Füge dein erstes Dokument hinzu, um loszulegen!
         </p>
       </div>
     );
@@ -58,7 +58,7 @@ function DocumentList({ documents, searchTextdocuments, searchTagdocuments, erro
   }
 
   // wenn wir hier ankommen gibt es mindestens ein Item
-  // wir rendern die Liste mit allen Items
+  // wir rendern die Liste mit allen Dokumenten
   return (
     <div className="item-list">
       {/* map transformiert das items-Array in ein Array von JSX-Elementen
@@ -73,7 +73,7 @@ function DocumentList({ documents, searchTextdocuments, searchTagdocuments, erro
           WICHTIG: niemals den Array-Index als key verwenden
           das fuehrt zu Problemen wenn Items hinzugefuegt geloescht oder sortiert werden */}
       {documents.map(document => (
-        <documentCard
+        <DocumentCard
           key={document.id}
           document={document}
           isEditing={editingId === document.id}
@@ -82,7 +82,7 @@ function DocumentList({ documents, searchTextdocuments, searchTagdocuments, erro
           onToggleFavorite={onToggleFavorite}
           onStartEdit={onStartEdit}
           onCancelEdit={onCancelEdit}
-          onUpdatedocument={onUpdatedocument}
+          onUpdatedocument={onUpdateDocument}
         />
       ))}
     </div>
