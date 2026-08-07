@@ -25,7 +25,7 @@ import DocumentCard from '../components/DocumentCard';
 // items ist das Array mit allen Items
 // onDelete und onToggleFavorite sind Callback-Funktionen
 // die wir an ItemCard weiterreichen
-function DocumentList({ documents, searchTextdocuments, searchTagDocuments, error, onDelete, onToggleFavorite, editingId,
+function DocumentList({ documents, error, onDelete,
   onStartEdit, onCancelEdit, onUpdateDocument}) {
   // Conditional Rendering: wenn keine Items vorhanden sind
   // zeigen wir einen Empty-State statt einer leeren Liste
@@ -76,10 +76,8 @@ function DocumentList({ documents, searchTextdocuments, searchTagDocuments, erro
         <DocumentCard
           key={document.id}
           document={document}
-          isEditing={editingId === document.id}
           onDelete={onDelete}
           error={error}
-          onToggleFavorite={onToggleFavorite}
           onStartEdit={onStartEdit}
           onCancelEdit={onCancelEdit}
           onUpdatedocument={onUpdateDocument}

@@ -3,7 +3,7 @@
     "id": 1,
     "patientId": 1,
     "title": "Arztbrief Kardiologie",
-    "important": true,
+    "important": false,
     "description": "Zusammenfassung der stationären Behandlung mit Empfehlungen für die Nachsorge.",
     "tags": "Herz,Kardiologie,Blutdruck"
   },
@@ -17,9 +17,9 @@
   },
   {
     "id": 3,
-    "patientId": 2,
+    "patientId": 1,
     "title": "Röntgen Thorax",
-    "important": true,
+    "important": false,
     "description": "Röntgenaufnahme des Brustkorbs zur Kontrolle der Lunge.",
     "tags": "Radiologie,Lunge,Thorax"
   },
@@ -27,7 +27,7 @@
     "id": 4,
     "patientId": 2,
     "title": "Entlassungsbericht",
-    "important": true,
+    "important": false,
     "description": "Abschlussbericht nach stationärem Aufenthalt.",
     "tags": "Entlassung,Therapie,Nachsorge"
   },
@@ -51,7 +51,7 @@
     "id": 7,
     "patientId": 4,
     "title": "Diabetes Verlauf",
-    "important": true,
+    "important": false,
     "description": "Kontrolle der Blutzuckerwerte und Anpassung der Medikation.",
     "tags": "Diabetes,Blutzucker,Medikation"
   },
@@ -67,7 +67,7 @@
     "id": 9,
     "patientId": 5,
     "title": "Operationsbericht",
-    "important": true,
+    "important": false,
     "description": "Dokumentation einer erfolgreich durchgeführten Hüftoperation.",
     "tags": "Operation,Hüfte,Chirurgie"
   },

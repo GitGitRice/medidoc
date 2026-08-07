@@ -172,7 +172,6 @@
   padding: 20px;
   border-radius: 8px;
   border: 1px solid #ddd;
-  border-left: 4px solid transparent;
 }
 
 .item-card:hover {
@@ -388,7 +387,7 @@
 
 .edit-btn {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 500;
   border-radius: 4px;
   cursor: pointer;

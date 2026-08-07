@@ -1,11 +1,24 @@
-export function PatientDetailPage( patient ) {
+export default function PatientDetailPage({patient} ) {
+  const formattedDate = new Date(patient.birthDate).toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+
   return (
-    <div>
-        <h3>Patientendetails</h3>
+    <div className="item-card">
+      <div className="item-card-header">
+        <h3 className="item-title">Patientendetails</h3>
+      </div>
         <p></p>
-        <h1>{patient.name}</h1>
+         <a className="item-url">
+          {patient.name}
+        </a>
         <p></p>
-        <p>{patient.birthdate} </p>
+        <a className="item-url">
+          {formattedDate}
+        </a>
+     
     </div>
   );
 }

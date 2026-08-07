@@ -3,13 +3,15 @@ import PatientDetail from '../components/PatientDetail';
 
 import '../App.css';
 
+import { useEffect, useState } from 'react';
+
 import { useParams } from "react-router-dom";
 
-import patients from "../data/patients.json";
-import documents from "../data/documents.json";
+import patientsAll from "../data/patients.json";
+import documentsAll from "../data/documents.json";
 
 
-export default function PatientDetailPage() {
+export function PatientDetailPage() {
 
   const { patientId } = useParams();
 
@@ -22,40 +24,29 @@ export default function PatientDetailPage() {
   // NEU: Error-State um Fehler anzuzeigen
   const [error, setError] = useState(null);
 
+  console.log("PatientId:   "+patientId );
+
   async function getPatient(patientId) {
-  return patients.find((p) => p.id === Number(id));
+  return patientsAll.find((p) => p.id === Number(patientId));
   }
 
   async function getDocuments(patientId) {
-    return documents.filter((d) => d.patientId === Number(patientId));
+    return documentsAll.filter((d) => d.patientId === Number(patientId));
   }
 
-  async function loadPatient(patientId) {
+  async function loadPatientAndDocuments(patientId) {
     try {
       setLoading(true);
       setError(null);
-      // API-Call: GET /items
-      //const data = await fetchPatient();
-      const data = getPatient(patientId);
-      setPatient(patientId);
+      const patientData = await getPatient(patientId);
+      console.log("Loading Patient: ", patientData)
+      setPatient(patientData);
+      const doccumentsData = await getDocuments(patientId);
+      console.log("Loading Documents: ", doccumentsData)
+      setDocuments(doccumentsData);
     } catch (err) {
       console.error("Fehler beim Laden:", err);
-      setError("Patient konnten nicht geladen werden. Läuft das Backend?");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadDocuments(patientId) {
-    try {
-      setLoading(true);
-      setError(null);
-      // API-Call: GET /items
-      const data = getDocuments(patientId);
-      setDocuments(data);
-    } catch (err) {
-      console.error("Fehler beim Laden:", err);
-      setError("Dokumente konnten nicht geladen werden. Läuft das Backend?");
+      setError("Patient und/oder Dokumente konnten nicht geladen werden. Läuft das Backend?");
     } finally {
       setLoading(false);
     }
@@ -84,7 +75,7 @@ export default function PatientDetailPage() {
     try {
       // API-Call: PATCH /items/{id} mit den geänderten Werten
       const updatedDocument = await updateDocument(id, {
-        favorite: updatedDocument.favorite,
+        important: updatedDocument.important,
         description: updatedDocument.description,
         title: updatedDocument.title,
         tags: updatedDocument.tags
@@ -110,15 +101,20 @@ export default function PatientDetailPage() {
     }
 
     useEffect(() => {
-    loadPatient(patientId) 
-    loadDocuments(patientId);
+      loadPatientAndDocuments(patientId) 
   }, []);
 
 
   return ( 
-        <main className="app-main">
+        <div className="app-main">
              <aside className="app-sidebar">
+              {loading ? (
+                <p style={{ textAlign: "center", color: "#888", padding: "40px" }}>
+                  Lade Patient...
+                </p>
+              ) : (
                 <PatientDetail patient = {patient} />
+              )}
               </aside>
             <section className="app-content">
               {error && (
@@ -156,14 +152,12 @@ export default function PatientDetailPage() {
                 documents = {documents}
                 error={error}
                 onDelete={handleDeleteDocument}
-                onToggleImportant={handleToggleImportant}
-                editingId={editingId}
                 onStartEdit={handleStartEdit}
                 onCancelEdit={handleCancelEdit}
                 onUpdateDocument={handleUpdateDocument}
               />
               )}
         </section>
-      </main>        
+      </div>        
       )
     }

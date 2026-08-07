@@ -1,7 +1,7 @@
 /* Bewusst neutral. Produktfarben und endgültiges Layout stehen noch nicht fest. */
 :root {
   font-family: system-ui, sans-serif;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 body {
@@ -15,7 +15,7 @@ input {
 }
 
 .page {
-  max-inline-size: 42rem;
+  max-inline-size: 50rem;
   margin-inline: auto;
   padding: 1rem;
 }

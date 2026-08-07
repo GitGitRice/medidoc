@@ -22,19 +22,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function DocumentCard({ document, isEditing, onDelete, onToggleFavorite, onStartEdit, onCancelEdit, onUpdateDokument }) {
+function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit, onUpdateDocument }) {
     // Lokaler State für Edit-Formular
   const [editTitle, setEditTitle] = useState(document.title || '');
   const [editDescription, setEditDescription] = useState(document.description || '');
-  const [editTags, setEditTags] = useState(document.tags?.join(', ') || '');
-
-  const navigate = useNavigate();
+  const [editTags, setEditTags] = useState(document.tags || '');
 
   // Wenn Item sich ändert, Formular-Werte aktualisieren
   useEffect(() => {
     setEditTitle(document.title);
     setEditDescription(document.description || '');
-    setEditTags(document.tags?.join(', ') || '');
+    setEditTags(document.tags || []);
   }, [document]);
 
   // Save Handler
@@ -42,11 +40,11 @@ function DocumentCard({ document, isEditing, onDelete, onToggleFavorite, onStart
     if (editTitle.trim() === '') return;
 
     const tags = editTags
-      .split(',')
+      .join(',')
       .map(tag => tag.trim().toLowerCase())
       .filter(tag => tag !== '');
 
-    onUpdatedocument(document.id, document.patientId, {
+    onUpdateDocument(document.id, document.patientId, {
       title: editTitle.trim(),
       description: editAuthor.trim(),
       tags: tags
@@ -110,18 +108,17 @@ function DocumentCard({ document, isEditing, onDelete, onToggleFavorite, onStart
 
   // NORMALE ANZEIGE
   return (
-   <article className={`item-card ${document.favorite ? 'item-card--favorite' : ''}`}>
+   <article className={`item-card ${document.important ? 'item-card--favorite' : ''}`}>
       <div className="item-card-header">
         <h3 className="item-title">{document.title}</h3>
         <button
-          className={`favorite-btn ${document.favorite ? 'favorite-btn--active' : ''}`}
-          onClick={() => onToggleFavorite(document.id)}
+          className={`favorite-btn ${document.important ? 'favorite-btn--active' : ''}`}
         >
-          {document.favorite ? '★' : '☆'}
+          {document.important ? '★' : '☆'}
         </button>
       </div>
 
-      {document.dexscription && (
+      {document.description && (
         <a className="item-url">
           {document.description}
         </a>
@@ -129,15 +126,17 @@ function DocumentCard({ document, isEditing, onDelete, onToggleFavorite, onStart
 
       {document.tags && document.tags.length > 0 && (
         <div className="item-tags">
-          {document.tags.map(tag => (
-            <span key={tag} className="tag">{tag}</span>
-          ))}
+          {document.tags?.split(',').map(tag => (
+            <span key={tag.trim()} className="tag">{tag}</span>
+          )) || '' }
         </div>
       )}
 
+      <span className="item-date">Erstellt: {formattedDate}</span>
+
       <div className="item-card-footer">
-        <span className="item-date">Erstellt: {formattedDate}</span>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        
+        <div style={{ display: 'flex', gap: '8px',  justifyContent: 'flex-end', width: '100%' }}>
           <button
             className="edit-btn edit-btn--cancel"
             onClick={() => onStartEdit(document.id)}
