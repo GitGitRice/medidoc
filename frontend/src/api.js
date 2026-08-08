@@ -110,3 +110,19 @@ export function login(email, password) {
 export function getCurrentUser(token, options = {}) {
   return apiRequest("/auth/me", { ...options, token });
 }
+
+/**
+ * Der Pfad für `GET /patients`, mit Seitengröße.
+ */
+export function patientsPath({ limit, offset } = {}) {
+  const params = new URLSearchParams();
+  if (limit != null) {
+    params.set("limit", limit);
+  }
+  if (offset != null) {
+    params.set("offset", offset);
+  }
+
+  const query = params.toString();
+  return query ? `/patients?${query}` : "/patients";
+}
