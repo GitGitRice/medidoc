@@ -1,7 +1,7 @@
 import DocumentList from '../components/DocumentList';
 import PatientDetail from '../components/PatientDetail';
 
-import '../App.css';
+import '../PatientDetailPage.css';
 
 import { useEffect, useState } from 'react';
 
@@ -17,6 +17,11 @@ export function PatientDetailPage() {
 
   const [patient, setPatient] = useState(null);
   const [documents, setDocuments] = useState([]);
+
+  const [searchTextDocuments, setSearchTextDocuments] = useState("");
+  const [searchTagDocuments, setSearchTagDocuments] = useState("");
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   
   // NEU: Loading-State um dem User Feedback zu geben
   const [loading, setLoading] = useState(true);
@@ -24,7 +29,7 @@ export function PatientDetailPage() {
   // NEU: Error-State um Fehler anzuzeigen
   const [error, setError] = useState(null);
 
-  console.log("PatientId:   "+patientId );
+  console.log("PatientId:   ", patientId );
 
   async function getPatient(patientId) {
   return patientsAll.find((p) => p.id === Number(patientId));
@@ -34,16 +39,21 @@ export function PatientDetailPage() {
     return documentsAll.filter((d) => d.patientId === Number(patientId));
   }
 
-  async function loadPatientAndDocuments(patientId) {
+  async function loadPatientWithDocuments(patientId) {
     try {
       setLoading(true);
       setError(null);
       const patientData = await getPatient(patientId);
+      
       console.log("Loading Patient: ", patientData)
+      
       setPatient(patientData);
+      
       const doccumentsData = await getDocuments(patientId);
       console.log("Loading Documents: ", doccumentsData)
+      
       setDocuments(doccumentsData);
+    
     } catch (err) {
       console.error("Fehler beim Laden:", err);
       setError("Patient und/oder Dokumente konnten nicht geladen werden. Läuft das Backend?");
@@ -53,34 +63,34 @@ export function PatientDetailPage() {
   }
 
   // HANDFLER
-  // Handler zum Loeschen 
+
+  // DELETE DOCUMENT
   async function handleDeleteDocument(id) {
     try {
-      // API-Call: DELETE /items/{id}
-      await deleteDocument(id);
-      // Item aus dem lokalen State entfernen
+      // API-Call: DELETE
+      // await deleteDocument(id);    
       setDocuments(prevDocuments => prevDocuments.filter(document => document.id !== id));
     } catch (err) {
-      console.error("Fehler beim Loeschen:", err);
-      setError("Buch konnte nicht geloescht werden.");
+      console.error("Fehler beim Löschen:", err);
+      setError("Dokument konnte nicht geloescht werden.");
     }
   }
 
-  // Handler fuer Favorit-Toggle - jetzt async mit API-Call
-  async function handleUpdateDocument(id, changeDocument) {
-    // aktuelles Item finden um den Favorit-Status umzukehren
+  // UPDATE Document
+  async function handleUpdateDocument(id, patientId, changeDocument) {
+
     const currentDocument = documents.find(document => document.id === id);
     if (!currentDocument) return;
 
     try {
-      // API-Call: PATCH /items/{id} mit den geänderten Werten
-      const updatedDocument = await updateDocument(id, {
-        important: updatedDocument.important,
-        description: updatedDocument.description,
-        title: updatedDocument.title,
-        tags: updatedDocument.tags
-      });
-      // Item im lokalen State aktualisieren
+      
+      const updatedDocument = {
+        id,
+        patientId, 
+        ...changeDocument,
+        tags: changeDocument.tags?.join(", ") ?? "",
+      };
+          
       setDocuments(prevDocuments =>
         prevDocuments.map(document => document.id === id ? updatedDocument : document)
       );
@@ -95,16 +105,45 @@ export function PatientDetailPage() {
       setEditingId(id);
     }
 
-    // Handler: Edit abbrechen
     function handleCancelEdit() {
       setEditingId(null);
     }
 
     useEffect(() => {
-      loadPatientAndDocuments(patientId) 
-  }, []);
+      loadPatientWithDocuments(patientId) 
+    }, []);
 
+  
+    const filteredDocuments = documents.filter( document => {
 
+    const searchTextLowerCase = searchTextDocuments.trim().toLowerCase();
+    if(searchTextLowerCase === "" && searchTagDocuments === "") {
+      return true; 
+    }
+
+    let textMatch = true;
+      
+    if (searchTextLowerCase.length > 0) {
+        const titleMatchBySearchText = document.title.trim().toLowerCase().includes(searchTextLowerCase);
+        const tagMatchBySearchText = document.tags == null ? 
+                  false : document.tags.toLowerCase().includes(searchTextLowerCase);
+          textMatch = titleMatchBySearchText || tagMatchBySearchText;
+    }
+/*
+    let tagMatch = true;
+
+    if (searchTagDocuments.length > 0 ) {
+      if (document.tags == null ) {
+        tagMatch = false;
+      }
+
+      tagMatch = document.tags.filter(tag => 
+        tag.includes(searchTagDocuments)).length > 0;
+           
+    }
+        */
+      return textMatch;
+    })
   return ( 
         <div className="app-main">
              <aside className="app-sidebar">
@@ -142,6 +181,15 @@ export function PatientDetailPage() {
                 </button>
               </div>
             )}  
+            <div className="item-form">
+              <input
+                type="text"
+                placeholder="Suche in Title, Tags"
+                className="form-input"
+                value={searchTextDocuments}
+                onChange = {(e) => setSearchTextDocuments(e.target.value)}
+              />
+            </div>
             {/* NEU: Loading-Anzeige waehrend die Dokumente geladen werden */}           
             {loading ? (
                 <p style={{ textAlign: "center", color: "#888", padding: "40px" }}>
@@ -149,8 +197,11 @@ export function PatientDetailPage() {
                 </p>
               ) : (
               <DocumentList
-                documents = {documents}
+                documents = {filteredDocuments}
+                searchTextDocuments={searchTextDocuments}
+                searchTagIDocuments={searchTagDocuments}
                 error={error}
+                editingId={editingId}
                 onDelete={handleDeleteDocument}
                 onStartEdit={handleStartEdit}
                 onCancelEdit={handleCancelEdit}

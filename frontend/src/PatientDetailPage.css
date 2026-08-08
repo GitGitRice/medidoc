@@ -174,20 +174,6 @@
   border: 1px solid #ddd;
 }
 
-.item-card:hover {
-  border-color: #bbb;
-  border-left-color: transparent;
-}
-
-.item-card--favorite {
-  border-left-color: #f1c40f;
-  background: #fffef5;
-}
-
-.item-card--favorite:hover {
-  border-left-color: #f1c40f;
-}
-
 .item-card-header {
   display: flex;
   justify-content: space-between;
@@ -202,24 +188,6 @@
   margin: 0;
   color: #333;
   line-height: 1.3;
-}
-
-.favorite-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: #ccc;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-
-.favorite-btn:hover {
-  color: #f1c40f;
-}
-
-.favorite-btn--active {
-  color: #f1c40f;
 }
 
 .item-url {
@@ -240,7 +208,7 @@
 
 .tag {
   display: inline-block;
-  padding: 4px 10px;
+  padding: 4px 5px;
   font-size: 12px;
   font-weight: 500;
   background: #f0f0f0;
@@ -262,7 +230,7 @@
 }
 
 .delete-btn {
-  padding: 6px 14px;
+  padding: 6px 7px;
   font-size: 13px;
   font-weight: 500;
   color: #c00;
@@ -387,7 +355,7 @@
 
 .edit-btn {
   padding: 8px 16px;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 500;
   border-radius: 4px;
   cursor: pointer;

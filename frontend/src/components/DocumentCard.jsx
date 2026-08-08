@@ -1,24 +1,3 @@
-// ===========================================================================
-// DOCUMENTCARD.JSX - Einzelne Item-Karte mit Interaktionen
-// ===========================================================================
-//
-// Diese Datei zeigt wie man Daten darstellt und Events an Eltern weitergibt
-// Die Komponente hat keinen eigenen State aber reagiert auf User-Aktionen
-//
-// React-Konzepte in dieser Datei:
-// - Event Handling: onClick fuer Button-Klicks
-// - Callback Props: Funktionen von Eltern aufrufen
-// - Conditional Rendering: Elemente nur bei Bedingung anzeigen
-// - Dynamische CSS-Klassen: Klassen basierend auf State aendern
-// - Listen rendern: map ueber Arrays mit key Prop
-// - Template Strings: Dynamische Klassennamen zusammenbauen
-//
-// ===========================================================================
-
-// Props Destructuring mit drei Werten
-// item enthaelt alle Daten des Items wie title url tags usw
-// onDelete ist eine Callback-Funktion zum Loeschen
-// onToggleFavorite ist eine Callback-Funktion zum Umschalten des Favoriten-Status
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -40,13 +19,13 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
     if (editTitle.trim() === '') return;
 
     const tags = editTags
-      .join(',')
+      .split(',')
       .map(tag => tag.trim().toLowerCase())
       .filter(tag => tag !== '');
 
     onUpdateDocument(document.id, document.patientId, {
       title: editTitle.trim(),
-      description: editAuthor.trim(),
+      description: editDescription.trim(),
       tags: tags
     });
   }
@@ -108,14 +87,9 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
 
   // NORMALE ANZEIGE
   return (
-   <article className={`item-card ${document.important ? 'item-card--favorite' : ''}`}>
+   <article className="item-card">
       <div className="item-card-header">
         <h3 className="item-title">{document.title}</h3>
-        <button
-          className={`favorite-btn ${document.important ? 'favorite-btn--active' : ''}`}
-        >
-          {document.important ? '★' : '☆'}
-        </button>
       </div>
 
       {document.description && (
