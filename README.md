@@ -7,7 +7,8 @@ Patientenübersicht als durchsuchbare Tabelle, Stammdatenpflege und eine Akte pr
 in der Befunde, Arztbriefe und Laborwerte abgelegt werden.
 
 > **Status:** Sprint 1. Anmeldung und die Patienten-Endpunkte stehen, im Frontend stehen
-> Login und geschütztes Routing — Übersicht und Detailseite sind noch Platzhalter.
+> Login, geschütztes Routing und die Patientenübersicht (Tabelle, Paginierung,
+> Navigation zur Detailseite) — die Detailseite selbst ist noch ein Platzhalter.
 > Fachliche Begriffe in [CONTEXT.md](./CONTEXT.md),
 > Entscheidungen in [docs/adr/](./docs/adr/), Sprint-1-Plan in
 > [docs/sprint-1-plan.md](./docs/sprint-1-plan.md).
@@ -23,7 +24,7 @@ in der Befunde, Arztbriefe und Laborwerte abgelegt werden.
 
 ## Tech-Stack
 
-- **Frontend:** React (Vite), React Router, Context API
+- **Frontend:** React (Vite), React Router, Context API, Material UI
 - **Backend:** FastAPI (Python)
 - **Datenbanken:** PostgreSQL für Patientenstammdaten, MongoDB für Dokumente
   — Begründung in [ADR-0002](./docs/adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)

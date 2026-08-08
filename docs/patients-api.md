@@ -440,13 +440,6 @@ Pfad, Query-Parameter und JSON-Keys sind englisch (`/patients`, `?q=`, `first_na
 Deutsch sind Kommentare, diese Doku und die Oberfläche im Frontend. Dieselbe Regel steht in
 [auth-api.md](./auth-api.md) und in [ADR-0005](./adr/0005-rollen-admin-und-staff.md).
 
-Zwischenzeitlich standen hier `/patienten` und `?suche=`. Der Weg zurück ist bewusst: eine
-Regel, die für die Hälfte der API gilt, ist keine Regel, und die Mischung hätte bei jedem
-neuen Endpunkt wieder verhandelt werden müssen.
-
-ADR-0005 nennt im Fließtext weiterhin `/patienten`. Eine angenommene Entscheidung wird
-nicht nachträglich umgeschrieben — verbindlich sind der Code und diese Datei.
-
 ## Offene Punkte
 
 - **`email` wird nicht auf Form geprüft**, nur als String gespeichert. Für echte Prüfung
