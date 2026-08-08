@@ -16,6 +16,19 @@ from app.modules.patients.schemas import PatientCreate, PatientUpdate
 MAX_LIMIT = 100
 
 
+def not_found_message(patient_id: int) -> str:
+    """Die Meldung für „diesen Patienten gibt es nicht".
+
+    Hier und nicht im Router, weil auch `modules/documents/` sie braucht: Jeder
+    Dokument-Endpunkt prüft zuerst den Patienten. Stünde der Satz an beiden
+    Stellen, hiesse derselbe Fehler je nach Route unterschiedlich.
+
+    Ein Satz ist kein HTTP — die Regel „`service.py` kennt kein HTTP" bleibt
+    unberührt, der Statuscode entsteht weiterhin im jeweiligen Router.
+    """
+    return f"Patient mit der ID {patient_id} wurde nicht gefunden"
+
+
 def search(
     session: Session,
     query: str | None = None,
