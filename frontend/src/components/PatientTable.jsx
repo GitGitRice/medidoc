@@ -38,11 +38,11 @@ function paginationItemLabel(type) {
 /**
  * Die Patiententabelle selbst — rein darstellend.
  *
- * Holt nichts nach und kennt keine Rollen (das übernimmt `PatientActions`
- * über `useAuth` selbst); bekommt Daten und Seitensteuerung ausschließlich
- * über Props. Der Zeilenklick navigiert direkt, genau wie der Details-Button
- * in `PatientActions` es für sich schon tut — kein zusätzlicher `onRowClick`
- * als Umweg über `Overview.jsx`.
+ * Holt nichts nach; bekommt Daten und Seitensteuerung ausschließlich über
+ * Props. `PatientActions` zeigt aktuell nur den Details-Button, ohne
+ * Rollenprüfung. Der Zeilenklick navigiert direkt, genau wie der
+ * Details-Button in `PatientActions` es für sich schon tut — kein
+ * zusätzlicher `onRowClick` als Umweg über `Overview.jsx`.
  */
 export function PatientTable({
   patients,
