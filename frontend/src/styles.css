@@ -15,7 +15,7 @@ input {
 }
 
 .page {
-  max-inline-size: 42rem;
+  max-inline-size: 75rem;
   margin-inline: auto;
   padding: 1rem;
 }

@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiRequest, FORBIDDEN_ERROR, getCurrentUser, login } from "./api.js";
+import {
+  ApiError,
+  apiRequest,
+  FORBIDDEN_ERROR,
+  getCurrentUser,
+  login,
+  patientsPath,
+} from "./api.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -44,6 +51,18 @@ describe("login", () => {
     });
     expect(options.body.toString()).toBe(
       "username=anna.admin%40medidoc.test&password=geheim123",
+    );
+  });
+});
+
+describe("patientsPath", () => {
+  it("zeigt ohne Parameter auf die Patientenübersicht", () => {
+    expect(patientsPath()).toBe("/patients");
+  });
+
+  it("hängt Seitengröße und Offset als Query an", () => {
+    expect(patientsPath({ limit: 25, offset: 50 })).toBe(
+      "/patients?limit=25&offset=50",
     );
   });
 });

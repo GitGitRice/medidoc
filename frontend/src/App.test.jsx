@@ -12,7 +12,7 @@ vi.mock("./api.js", async () => ({
   ...(await vi.importActual("./api.js")),
   getCurrentUser: vi.fn(),
   login: vi.fn(),
-  apiRequest: vi.fn(),
+  apiRequest: vi.fn().mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 }),
 }));
 
 const user = {
