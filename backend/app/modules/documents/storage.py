@@ -1,8 +1,13 @@
-"""Die Bytes einer hochgeladenen Datei — auf der Platte, nicht in der Datenbank.
+"""Die Bytes eines Anhangs — auf der Platte, nicht in der Datenbank.
 
-MongoDB hält die Angaben zum Dokument, hier liegt die Datei selbst. Warum
-getrennt, steht in ADR-0002: Die Begründung für MongoDB ist die Heterogenität
-der Metadaten, nicht die Dateiablage.
+MongoDB hält die Angaben zum Dokument, hier liegen die Bytes. Warum getrennt,
+steht in ADR-0002: Die Begründung für MongoDB ist die Heterogenität der
+Angaben, nicht die Dateiablage.
+
+> **Warum hier „Datei" steht und sonst „Anhang".** CONTEXT.md verbietet
+> „Datei" als Wort für den *fachlichen* Begriff — das ist der **Anhang**. In
+> dieser Datei geht es aber wirklich um Dateien auf einem Dateisystem: um
+> Blöcke, Endungen und Pfade. Nur `storage.py` darf so reden.
 
 Zwei Dinge, auf die es in dieser Datei ankommt:
 
@@ -138,8 +143,26 @@ class FileStorage:
 
         Wird beim Löschen eines Patienten gebraucht: Ohne das blieben seine
         Dateien liegen, unerreichbar und trotzdem auf der Platte.
+
+        Anders als `delete` schluckt diese Methode einen Fehler **nicht**. Dort
+        geht es um eine einzelne Datei zu einem Dokument, das ohnehin schon weg
+        ist; hier um alles, was von einem Patienten übrig ist. Bleibt davon
+        etwas liegen, muss es jemand erfahren — eine `204` mit einer Zahl
+        daneben behauptete sonst ein Aufräumen, das nicht stattgefunden hat.
+        Ein Ordner, den es nie gab, ist kein Fehler.
         """
-        shutil.rmtree(self.root / str(patient_id), ignore_errors=True)
+        folder = self.root / str(patient_id)
+        try:
+            shutil.rmtree(folder)
+        except FileNotFoundError:
+            return
+        except OSError:
+            log.error(
+                "documents: Ordner des Patienten nicht abgeräumt",
+                extra={"patient_id": patient_id},
+                exc_info=True,
+            )
+            raise
 
 
 _storage: FileStorage | None = None

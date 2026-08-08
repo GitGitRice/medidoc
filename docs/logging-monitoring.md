@@ -60,6 +60,7 @@ Kein zweites Anwendungslog. Hier landet nur, was eine **Sicherheitsfrage** beant
 | `forbidden` | `403` — angemeldet, aber Rolle reicht nicht | warning |
 | `not_found` | `404` — einzeln harmlos, gehäuft eine Enumeration | warning |
 | `patient_created` / `patient_updated` / `patient_deleted` | schreibender Zugriff | info |
+| `document_created` / `document_deleted` | Dokument angelegt oder gelöscht — **ohne** Dateiname, Titel und `fields` | info |
 | `suspicious` | eine Regel hat angeschlagen | warning |
 
 **Lesende Zugriffe auf Patienten stehen nicht drin.** Die Übersicht wird den ganzen Tag

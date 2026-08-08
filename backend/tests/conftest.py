@@ -62,27 +62,32 @@ def audit_store_fixture() -> Generator[MemoryAuditStore, None, None]:
     set_store(None)
 
 
+@pytest.fixture(name="upload_dir")
+def upload_dir_fixture(tmp_path):
+    """Der Ordner, in dem die Anhänge dieses Tests wirklich landen.
+
+    Eine Quelle für den Pfad: `documents` baut die Ablage **aus dieser
+    Fixture**. Stünde `tmp_path / "uploads"` an beiden Stellen, zeigte ein Test
+    irgendwann woanders hin als die Ablage, die er prüft.
+    """
+    return tmp_path / "uploads"
+
+
 @pytest.fixture(name="documents", autouse=True)
-def documents_fixture(tmp_path) -> Generator[MemoryDocumentStore, None, None]:
-    """Leerer Dokumentenspeicher und ein eigener Upload-Ordner pro Test.
+def documents_fixture(upload_dir) -> Generator[MemoryDocumentStore, None, None]:
+    """Leerer Dokumentenspeicher und eine eigene Ablage pro Test.
 
     `autouse` und `tmp_path`: Ohne das schriebe jeder Testlauf in das echte
-    Upload-Verzeichnis aus der Konfiguration und ließe die Dateien dort liegen.
+    Verzeichnis aus der Konfiguration und ließe die Dateien dort liegen.
     """
     store = MemoryDocumentStore()
     set_document_store(store)
-    set_storage(FileStorage(tmp_path / "uploads"))
+    set_storage(FileStorage(upload_dir))
 
     yield store
 
     set_document_store(None)
     set_storage(None)
-
-
-@pytest.fixture(name="upload_dir")
-def upload_dir_fixture(tmp_path):
-    """Der Ordner, in dem die Dateien dieses Tests wirklich landen."""
-    return tmp_path / "uploads"
 
 
 @pytest.fixture(name="client")

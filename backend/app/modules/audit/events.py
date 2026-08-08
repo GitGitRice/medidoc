@@ -38,10 +38,13 @@ class EventType(StrEnum):
     PATIENT_UPDATED = "patient_updated"
     PATIENT_DELETED = "patient_deleted"
 
-    # Dokumente. Der Dateiname wird bewusst **nicht** mitgeschrieben — er heißt
-    # in der Praxis gern "Mueller_Befund.pdf" und wäre damit genau die
-    # Patientenangabe, die hier nicht hingehört.
-    DOCUMENT_UPLOADED = "document_uploaded"
+    # Dokumente. `document_created` und nicht `document_uploaded`: Ein Dokument
+    # entsteht auch **ohne** Anhang, hochgeladen wird dabei nichts.
+    #
+    # Der Dateiname wird bewusst **nicht** mitgeschrieben — er heißt in der
+    # Praxis gern "Mueller_Befund.pdf" und wäre damit genau die Patientenangabe,
+    # die hier nicht hingehört.
+    DOCUMENT_CREATED = "document_created"
     DOCUMENT_DELETED = "document_deleted"
 
     # Zugriff auf eine ID, die es nicht gibt. Einzeln harmlos, gehäuft der
@@ -65,7 +68,7 @@ _INFO_EVENTS = frozenset(
         EventType.PATIENT_CREATED,
         EventType.PATIENT_UPDATED,
         EventType.PATIENT_DELETED,
-        EventType.DOCUMENT_UPLOADED,
+        EventType.DOCUMENT_CREATED,
         EventType.DOCUMENT_DELETED,
     }
 )

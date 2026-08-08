@@ -2,9 +2,13 @@
 
 | Methode | Pfad | |
 | ------- | ---- | - |
-| `POST` | `/docs/{patient_id}` | Datei hochladen, multipart |
+| `POST` | `/docs/{patient_id}` | Dokument anlegen, multipart |
 | `GET` | `/docs/{patient_id}?q=&limit=&offset=` | Dokumente auflisten |
 | `DELETE` | `/docs/{patient_id}/{document_id}` | Dokument löschen, nur `admin` |
+
+Ein Dokument besteht aus Angaben und **optional** einem Anhang (CONTEXT.md).
+Angelegt wird deshalb auch ohne Anhang — `multipart` bleibt es trotzdem, weil
+dieselbe Route auch den Fall mit Anhang bedient.
 
 Alle verlangen einen angemeldeten Benutzer; die Prüfung hängt wie bei den
 Patienten am Router und nicht an den einzelnen Funktionen, damit ein neu
@@ -67,7 +71,7 @@ AdminUser = Annotated[User, Depends(require_roles(Role.ADMIN))]
 UNAUTHORIZED = {"model": ErrorResponse, "description": "Nicht angemeldet"}
 FORBIDDEN = {"model": ErrorResponse, "description": "Rolle reicht nicht"}
 NOT_FOUND = {"model": ErrorResponse, "description": "Patient oder Dokument nicht gefunden"}
-TOO_LARGE = {"model": ErrorResponse, "description": "Datei zu groß"}
+TOO_LARGE = {"model": ErrorResponse, "description": "Anhang zu groß"}
 UNPROCESSABLE = {"model": ErrorResponse, "description": "Eingabe ungültig"}
 
 
@@ -75,7 +79,7 @@ UNPROCESSABLE = {"model": ErrorResponse, "description": "Eingabe ungültig"}
     "/{patient_id}",
     response_model=DocumentPublic,
     status_code=status.HTTP_201_CREATED,
-    summary="Dokument hochladen",
+    summary="Dokument anlegen",
     responses={
         401: UNAUTHORIZED,
         404: NOT_FOUND,
@@ -83,11 +87,13 @@ UNPROCESSABLE = {"model": ErrorResponse, "description": "Eingabe ungültig"}
         422: UNPROCESSABLE,
     },
 )
-def upload_document(
+def create_document(
     request: Request,
     session: SessionDep,
     patient_id: int,
-    file: Annotated[UploadFile, File(description="Die Datei, höchstens 20 MB")],
+    document_type: Annotated[
+        str, Form(description="Dokumenttyp, z. B. \"befund\" oder \"laborwert\"")
+    ],
     title: Annotated[str, Form(description="Titel des Dokuments")],
     description: Annotated[str | None, Form()] = None,
     tags: Annotated[
@@ -96,56 +102,81 @@ def upload_document(
     source: Annotated[
         str | None, Form(description="Woher das Dokument stammt, z. B. \"Radiologie Mitte\"")
     ] = None,
+    fields: Annotated[
+        str | None,
+        Form(
+            description=(
+                "Die typabhängigen Angaben als JSON-Objekt, "
+                "z. B. {\"hb\": 13.4, \"einheit\": \"g/dl\"}"
+            )
+        ),
+    ] = None,
+    file: Annotated[
+        UploadFile | None,
+        File(description="Der Anhang — optional, höchstens 20 MB"),
+    ] = None,
 ) -> DocumentPublic:
-    """Legt ein Dokument in der Akte eines Patienten ab.
+    """Legt ein Dokument in der Akte eines Patienten an.
 
-    **Multipart**, nicht JSON — anders reist eine Datei nicht. `tags` kommt
-    kommagetrennt herein und geht als Liste wieder hinaus.
+    **Multipart**, nicht JSON — anders reist ein Anhang nicht. `tags` kommt
+    kommagetrennt herein und geht als Liste wieder hinaus, `fields` als
+    JSON-Objekt.
 
-    Über 20 MB antwortet die API mit `413`, eine leere Datei mit `422`. Geprüft
-    wird beim Schreiben und nicht danach, damit eine große Datei nicht erst
-    vollständig im Speicher landet.
+    **Der Anhang ist optional** (CONTEXT.md: „ein Dokument ohne Anhang ist
+    gültig"). Wird das Feld `file` weggelassen, entsteht ein Dokument ohne
+    Anhang; wird es mitgeschickt, muss etwas drin sein — ein leerer Anhang ist
+    ein Versehen und ergibt `422`.
+
+    Über 20 MB antwortet die API mit `413`. Geprüft wird beim Schreiben und
+    nicht danach, damit ein großer Anhang nicht erst vollständig im Speicher
+    landet.
     """
     _patient_or_404(session, patient_id)
 
-    metadata = _metadata(title, description, tags, source)
+    metadata = _metadata(document_type, title, description, tags, source, fields)
 
     try:
         document = service.create(
             patient_id=patient_id,
             metadata=metadata,
-            stream=file.file,
-            filename=file.filename,
-            content_type=file.content_type,
-            uploaded_by=request.state.user_id,
+            stream=file.file if file is not None else None,
+            filename=file.filename if file is not None else None,
+            content_type=file.content_type if file is not None else None,
+            created_by=request.state.user_id,
         )
     except FileTooLarge as too_large:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=(
-                f"Die Datei ist größer als {_megabytes(too_large.limit_bytes)} MB "
+                f"Der Anhang ist größer als {_megabytes(too_large.limit_bytes)} MB "
                 "und wurde nicht gespeichert"
             ),
         ) from None
     except EmptyFile:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Die Datei ist leer",
+            detail="Der Anhang ist leer",
         ) from None
 
     audit.record(
-        EventType.DOCUMENT_UPLOADED,
+        EventType.DOCUMENT_CREATED,
         request=request,
         status=status.HTTP_201_CREATED,
         user_id=request.state.user_id,
         target=f"document:{document.id}",
         # Kein Dateiname und kein Titel — beide tragen in der Praxis
-        # Patientennamen. Größe und Typ sagen genug, um einen Vorfall
-        # einzuordnen.
+        # Patientennamen. Der Dokumenttyp ist dagegen eine feste Fachkategorie
+        # und verrät nichts über den Patienten; Größe und Typ sagen genug, um
+        # einen Vorfall einzuordnen.
         detail={
             "patient": f"patient:{patient_id}",
-            "size_bytes": document.size_bytes,
-            "content_type": document.content_type,
+            "document_type": document.document_type,
+            "size_bytes": (
+                document.attachment.size_bytes if document.attachment else None
+            ),
+            "content_type": (
+                document.attachment.content_type if document.attachment else None
+            ),
         },
     )
 
@@ -165,7 +196,7 @@ def list_documents(
         str | None,
         Query(description="Filtert nach Titel oder Beschreibung, Schreibweise egal"),
     ] = None,
-    limit: Annotated[int, Query(ge=1, le=service.MAX_LIMIT)] = service.DEFAULT_LIMIT,
+    limit: Annotated[int, Query(ge=1, le=service.MAX_LIMIT)] = service.MAX_LIMIT,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> DocumentPage:
     """Alle Dokumente eines Patienten, neueste zuerst.
@@ -192,7 +223,7 @@ def delete_document(
     patient_id: int,
     document_id: str,
 ) -> None:
-    """Löscht Angaben und Datei endgültig — nur als `admin`.
+    """Löscht Angaben und Anhang endgültig — nur als `admin`.
 
     Zweimaliges Löschen ist kein Serverfehler: Der zweite Aufruf findet das
     Dokument nicht mehr und antwortet mit `404`.
@@ -216,7 +247,12 @@ def delete_document(
 
 
 def _metadata(
-    title: str, description: str | None, tags: str | None, source: str | None
+    document_type: str,
+    title: str,
+    description: str | None,
+    tags: str | None,
+    source: str | None,
+    fields: str | None,
 ) -> DocumentMetadata:
     """Baut die geprüften Angaben — und macht aus einem Fehler ein `422`.
 
@@ -228,10 +264,12 @@ def _metadata(
     """
     try:
         return DocumentMetadata(
+            document_type=document_type,
             title=title,
             description=description,
             tags=parse_tags(tags),
             source=source,
+            fields=fields,
         )
     except ValidationError as invalid:
         # `("title",)` wird zu `("body", "title")`, damit der Feldname in der
@@ -246,14 +284,16 @@ def _metadata(
 def _patient_or_404(session: Session, patient_id: int) -> None:
     """Dokumente hängen immer an einem Patienten, den es gibt.
 
-    Ohne diese Prüfung ließen sich Dateien unter einer beliebigen Zahl ablegen —
+    Ohne diese Prüfung ließen sich Anhänge unter einer beliebigen Zahl ablegen —
     sie wären über die Liste nie wieder zu sehen und lägen trotzdem auf der
     Platte.
     """
     if patients_service.get(session, patient_id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Patient mit der ID {patient_id} wurde nicht gefunden",
+            # Der Satz kommt aus `patients` — derselbe Fehler soll überall
+            # gleich heißen, egal über welche Route er auffällt.
+            detail=patients_service.not_found_message(patient_id),
         )
 
 

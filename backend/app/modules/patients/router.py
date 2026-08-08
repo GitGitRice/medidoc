@@ -179,15 +179,33 @@ def delete_patient(
     patient = _get_or_404(session, patient_id)
     service.delete(session, patient)
 
-    # Die Akte geht mit. Ohne das blieben Dokumente und Dateien liegen: über
+    # Die Akte geht mit. Ohne das blieben Dokumente und Anhänge liegen: über
     # die API nicht mehr erreichbar, weil jeder Dokument-Endpunkt den Patienten
     # voraussetzt, und trotzdem auf der Platte. Zuerst der Patient, dann die
-    # Akte — bricht es dazwischen ab, bleiben verwaiste Dateien statt eines
+    # Akte — bricht es dazwischen ab, bleiben verwaiste Anhänge statt eines
     # Patienten ohne seine Dokumente.
-    removed_documents = documents_service.delete_for_patient(patient_id)
+    #
+    # Der Trail-Eintrag darf an diesem Schritt **nicht** hängen. Der Patient ist
+    # in Postgres schon weg; ab hier ist der Eintrag der einzige Beleg, dass es
+    # ihn je gab. Räumt `documents` nicht ab — etwa weil MongoDB gerade nicht
+    # antwortet —, wird trotzdem protokolliert und der Fehler danach
+    # weitergereicht. Andersherum wäre der Patient gelöscht und niemand wüsste,
+    # von wem.
+    try:
+        removed_documents = documents_service.delete_for_patient(patient_id)
+    except Exception:
+        _audit(
+            request,
+            EventType.PATIENT_DELETED,
+            None,
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            patient_id=patient_id,
+            # `null`, nicht `0`: Wie viele es waren, weiß hier niemand — und
+            # `0` hieße „der Patient hatte keine", was etwas anderes ist.
+            documents_removed=None,
+        )
+        raise
 
-    # Nach dem Löschen protokolliert: Der Eintrag im Trail ist ab jetzt der
-    # einzige Beleg, dass es diesen Patienten je gab.
     _audit(
         request,
         EventType.PATIENT_DELETED,
@@ -228,7 +246,7 @@ def _get_or_404(session: Session, patient_id: int) -> Patient:
     if patient is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Patient mit der ID {patient_id} wurde nicht gefunden",
+            detail=service.not_found_message(patient_id),
         )
     return patient
 

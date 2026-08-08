@@ -78,7 +78,7 @@ beim Import, auch im Test.
 | [tests/test_auth_authorization.py](tests/test_auth_authorization.py) | Token-Prüfung und Rollen, für **alle** Patienten-Routen auf einmal |
 | [tests/test_patients_api.py](tests/test_patients_api.py) | Patienten-Endpunkte, gegliedert nach Endpunkt |
 | [tests/test_audit.py](tests/test_audit.py) | Audit-Trail, Datensparsamkeit, Missbrauchserkennung, Monitoring |
-| [tests/test_documents_api.py](tests/test_documents_api.py) | Datei-Upload, 20-MB-Grenze, Ablage auf der Platte |
+| [tests/test_documents_api.py](tests/test_documents_api.py) | Dokumente je Patient, Dokumenttyp, Anhang (auch ohne), 20-MB-Grenze, Ablage |
 
 Was sich gegen SQLite **nicht** prüfen lässt, steht als Kommentar im jeweiligen Testkopf.
 Der wichtigste Fall: SQLite ignoriert die Groß-/Kleinschreibung nur bei ASCII-Zeichen, die
@@ -114,7 +114,7 @@ backend/
         ├── patients/    Strang B — Tiran
         ├── users/       Benutzer-Model, Verwaltung ist Sprint 2
         ├── auth/        Strang C — Steven
-        ├── documents/   Datei-Upload je Patient (MongoDB + Volume)
+        ├── documents/   Dokumente je Patient (MongoDB + Volume)
         └── audit/       Audit-Trail und Missbrauchserkennung (MongoDB)
 ```
 
@@ -128,9 +128,22 @@ Jedes Modul hat, was es braucht, immer unter demselben Namen:
 | `router.py` | Endpunkte | ja |
 | `seed.py` | Testdaten des Moduls | nein |
 
-Zwei Ausnahmen: `modules/audit/` und `modules/documents/` haben `store.py` statt `models.py` — ihre Daten liegen in
-MongoDB, nicht in Postgres, und haben deshalb keine SQLModel-Tabelle
-([ADR-0007](../docs/adr/0007-mongodb-fuer-audit-und-monitoring.md)).
+Zwei Ausnahmen, beide aus demselben Grund — ihre Daten liegen in MongoDB, nicht in
+Postgres, und haben deshalb keine SQLModel-Tabelle:
+
+| Modul | Statt `models.py` | Warum |
+| ----- | ----------------- | ----- |
+| `modules/audit/` | `store.py` | der Trail liegt in MongoDB ([ADR-0007](../docs/adr/0007-mongodb-fuer-audit-und-monitoring.md)) |
+| `modules/documents/` | `store.py` **und** zusätzlich `storage.py` | die Angaben zum Dokument liegen in MongoDB, die Bytes eines Anhangs auf einem Volume ([ADR-0002](../docs/adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)) |
+
+`documents/storage.py` ist die einzige Datei, die Bytes auf die Platte schreibt. Sie steht
+neben `service.py` und nicht darin, weil sie etwas anderes tut: `service.py` entscheidet,
+`storage.py` schreibt. Sie ist auch die einzige Stelle, an der „Datei" das richtige Wort
+ist — überall sonst heißt der fachliche Begriff **Anhang**
+([CONTEXT.md](../CONTEXT.md), [docs/documents-api.md](../docs/documents-api.md#namensgebung)).
+Das gilt für die deutsche Prosa. Englische Bezeichner folgen der Regel „JSON-Keys und
+Formularfelder sind englisch": `attachment` ist die Übersetzung von **Anhang** und damit
+richtig, ebenso `UPLOAD_DIR` und `MAX_UPLOAD_BYTES` als Namen der Ablage.
 
 Die eine Regel, die den Rest trägt: **`service.py` kennt kein HTTP.** Keine
 `HTTPException`, keine Statuscodes, keine `Depends`. Der Router übersetzt zwischen beidem.
@@ -224,6 +237,33 @@ Drei Dinge, die beim Lesen des Codes sonst überraschen:
 
 Damit die Doku nicht doppelt gepflegt werden muss: Alles Fachliche gehört nach
 `docs/patients-api.md`, hier steht nur, wie der Code aufgebaut ist.
+
+## Dokumente-API
+
+Der vollständige Vertrag steht in **[docs/documents-api.md](../docs/documents-api.md)**.
+Hier nur der Überblick:
+
+| Methode | Pfad | Zweck | Verlangt |
+| ------- | ---- | ----- | -------- |
+| `POST` | `/docs/{patient_id}` | Dokument anlegen, multipart → `201` | Token |
+| `GET` | `/docs/{patient_id}?q=&limit=&offset=` | Dokumente eines Patienten | Token |
+| `DELETE` | `/docs/{patient_id}/{document_id}` | endgültig löschen → `204` | Token + `admin` |
+
+Drei Dinge, die beim Lesen des Codes sonst überraschen:
+
+- **Ein Dokument ist nicht die Datei.** Es besteht aus Angaben, deren Felder vom
+  **Dokumenttyp** abhängen (`fields`), und **optional** einem **Anhang**. Ein Dokument ohne
+  Anhang ist gültig — so steht es in [CONTEXT.md](../CONTEXT.md), und genau daran hängt auch
+  die Begründung von ADR-0002: Ohne heterogene Angaben gäbe es keinen Grund für MongoDB.
+- **`document_type` wird gegen keine Liste geprüft.** CONTEXT.md verlangt neue
+  Dokumenttypen ohne Schemaänderung; welche üblich sind, steht in der Doku, nicht im Code.
+  Getrimmt und kleingeschrieben wird trotzdem, sonst wären `Befund` und `befund` zwei Typen.
+- **Zwei Speicher in einem Vorgang.** `service.create` schreibt erst die Bytes, dann die
+  Angaben — und nimmt die Bytes zurück, wenn der zweite Schritt scheitert. Sonst lägen
+  Anhänge auf der Platte, zu denen es kein Dokument gibt.
+
+Damit die Doku nicht doppelt gepflegt werden muss: Alles Fachliche gehört nach
+`docs/documents-api.md`, hier steht nur, wie der Code aufgebaut ist.
 
 ## Logging und Monitoring
 

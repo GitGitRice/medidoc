@@ -1,13 +1,18 @@
 """Die Angaben zu den Dokumenten — in MongoDB.
 
 Zwei Ausführungen hinter derselben Schnittstelle, wie beim Audit-Trail:
-`MongoDocumentStore` für den Betrieb, `MemoryDocumentStore` für die Tests und
-für den Start ohne Mongo.
+`MongoDocumentStore` für den Betrieb, `MemoryDocumentStore` **nur für die
+Tests**, die ihn über `set_store` selbst einsetzen.
 
 **Anders als beim Audit-Trail werden Fehler hier nicht geschluckt.** Ein
-verlorener Protokolleintrag ist ärgerlich; ein Upload, der „ok" meldet und
+verlorener Protokolleintrag ist ärgerlich; ein Anlegen, das „ok" meldet und
 dessen Dokument danach nirgends auftaucht, ist schlimmer als eine
 Fehlermeldung. Was hier schiefgeht, wird zur Antwort.
+
+Aus demselben Grund gibt es **keinen stillen Rückfall in den Speicher**: Ohne
+`MONGO_URL` liefert `get_store()` keinen Ersatz, sondern einen Fehler. Der
+Audit-Trail darf ohne Mongo weiterlaufen — ein verlorenes Protokoll ist kein
+verlorener Befund —, die Akte eines Patienten nicht (ADR-0002, ADR-0007).
 """
 
 import re
@@ -16,20 +21,42 @@ from typing import Any, Protocol
 COLLECTION = "documents"
 
 
-def _search_filter(patient_id: int, q: str | None) -> dict[str, Any]:
-    """Der Filter für Liste und Zählung — für beide derselbe.
+# Worin `q` sucht. **Beide** Ausführungen lesen diese Liste — sonst fände die
+# eine etwas, das die andere nicht findet, und weil die Tests gegen den
+# Speicher-Store laufen, fiele ausgerechnet der Mongo-Fall niemandem auf.
+SEARCHED_FIELDS = ("title", "description")
 
-    `q` trifft in Titel **oder** Beschreibung, Groß- und Kleinschreibung egal.
+
+def normalize_term(q: str | None) -> str:
+    """Der Suchbegriff, wie ihn beide Speicher sehen: getrimmt, kleingeschrieben."""
+    return (q or "").strip().lower()
+
+
+def matches_term(document: dict[str, Any], term: str) -> bool:
+    """Trifft `term` in einem der durchsuchten Felder?
+
+    Ein leerer Begriff trifft alles — „keine Suche" ist kein Filter.
+    """
+    if not term:
+        return True
+    return any(
+        term in (document.get(field) or "").lower() for field in SEARCHED_FIELDS
+    )
+
+
+def _search_filter(patient_id: int, q: str | None) -> dict[str, Any]:
+    """Derselbe Filter als Mongo-Kriterium — für Liste und Zählung.
+
     `re.escape` ist hier nicht Kosmetik: Ohne das wäre eine Suche nach `.*` ein
     Ausdruck, der alles findet, und eine nach `(` ein Fehler.
     """
     query: dict[str, Any] = {"patient_id": patient_id}
 
-    if q and q.strip():
-        pattern = re.escape(q.strip())
+    term = normalize_term(q)
+    if term:
+        pattern = re.escape(term)
         query["$or"] = [
-            {"title": {"$regex": pattern, "$options": "i"}},
-            {"description": {"$regex": pattern, "$options": "i"}},
+            {field: {"$regex": pattern, "$options": "i"}} for field in SEARCHED_FIELDS
         ]
 
     return query
@@ -52,7 +79,12 @@ class DocumentStore(Protocol):
 
 
 class MemoryDocumentStore:
-    """Metadaten im Prozessspeicher. Für Tests und den Betrieb ohne Mongo."""
+    """Metadaten im Prozessspeicher — für die Tests.
+
+    Bewusst **nicht** der Rückfall im Betrieb: Ein Dokument, das den Neustart
+    nicht überlebt, ist ein verlorener Befund. Wer ihn braucht, setzt ihn über
+    `set_store` selbst ein.
+    """
 
     def __init__(self) -> None:
         self._documents: list[dict[str, Any]] = []
@@ -69,24 +101,19 @@ class MemoryDocumentStore:
     def search(
         self, patient_id: int, q: str | None, limit: int, offset: int
     ) -> tuple[list[dict[str, Any]], int]:
-        term = (q or "").strip().lower()
+        term = normalize_term(q)
 
-        matches = [
+        found = [
             document
             for document in self._documents
-            if document["patient_id"] == patient_id
-            and (
-                not term
-                or term in document["title"].lower()
-                or term in (document.get("description") or "").lower()
-            )
+            if document["patient_id"] == patient_id and matches_term(document, term)
         ]
         # Neueste zuerst, `_id` als Stichentscheid — sonst wechselte die
         # Reihenfolge bei gleichem Zeitstempel und das Blättern zeigte
         # Dokumente doppelt.
-        matches.sort(key=lambda d: (d["created_at"], d["_id"]), reverse=True)
+        found.sort(key=lambda d: (d["created_at"], d["_id"]), reverse=True)
 
-        return [dict(d) for d in matches[offset : offset + limit]], len(matches)
+        return [dict(d) for d in found[offset : offset + limit]], len(found)
 
     def delete(self, patient_id: int, document_id: str) -> bool:
         before = len(self._documents)
@@ -142,14 +169,14 @@ class MongoDocumentStore:
     ) -> tuple[list[dict[str, Any]], int]:
         query = _search_filter(patient_id, q)
 
-        matches = (
+        found = (
             self._collection.find(query)
             .sort([("created_at", self._descending), ("_id", self._descending)])
             .skip(offset)
             .limit(limit)
         )
 
-        return list(matches), self._collection.count_documents(query)
+        return list(found), self._collection.count_documents(query)
 
     def delete(self, patient_id: int, document_id: str) -> bool:
         result = self._collection.delete_one(
@@ -186,8 +213,15 @@ def _build_store() -> DocumentStore:
     log = logging.getLogger(__name__)
 
     if not settings.mongo_url:
-        log.info("documents: kein MONGO_URL gesetzt, Metadaten liegen im Speicher")
-        return MemoryDocumentStore()
+        # Kein Rückfall in den Speicher. Der wäre die freundlichere Antwort und
+        # die falsche: Das Anlegen meldete `201`, der Anhang läge wirklich auf
+        # der Platte, und nach dem nächsten Neustart wäre das Dokument weg —
+        # ohne dass irgendwo etwas schiefgegangen wäre. Lieber gar kein
+        # Dokument als eines, auf das sich niemand verlassen kann.
+        log.error("documents: MONGO_URL ist nicht gesetzt, kein Dokumentenspeicher")
+        raise RuntimeError(
+            "MONGO_URL ist nicht gesetzt — Dokumente brauchen MongoDB (ADR-0002)"
+        )
 
     store = MongoDocumentStore(settings.mongo_url, settings.mongo_db)
     try:
