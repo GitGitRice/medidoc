@@ -13,8 +13,10 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 export function PatientActions({ patient }) {
   const navigate = useNavigate();
 
+  // `justifyContent` gehoert in `sx`: Als eigene Prop nimmt `Stack` es in
+  // dieser MUI-Fassung nicht mehr an und reicht es wirkungslos durch.
   return (
-    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+    <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
       <Tooltip title="Patientendetails öffnen">
         <IconButton
           size="small"

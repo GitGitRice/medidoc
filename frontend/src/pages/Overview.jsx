@@ -3,11 +3,11 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
 import { patientsPath } from "../api.js";
 import { useAuth } from "../auth/AuthContext.jsx";
+import { PageHeader } from "../components/PageHeader.jsx";
 import { PatientSearch } from "../components/PatientSearch.jsx";
 import { PatientTable } from "../components/PatientTable.jsx";
 
@@ -62,27 +62,19 @@ export function Overview() {
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        alignItems="baseline"
-        justifyContent="space-between"
-        sx={{ marginBlockEnd: 2 }}
-      >
-        <Box>
-          {/* Layout.jsx traegt bereits <h1>MediDoc</h1> — diese Ueberschrift
-              bleibt deshalb h2, keine zweite h1 auf derselben Seite. */}
-          <Typography variant="h4" component="h2">
-            Patientenübersicht
-          </Typography>
-          {!error && patients !== null && (
-            <Typography variant="body2" color="text.secondary">
-              {total} {total === 1 ? "Patient" : "Patienten"}
-            </Typography>
-          )}
-        </Box>
-        {/* "Neuer Patient" bewusst nicht gerendert: weder eine Route
-            (/patients/new) noch ein api.js-Aufruf dafuer existieren. */}
-      </Stack>
+      {/* Ohne Aktion: "Neuer Patient" ist bewusst nicht gerendert, weil es
+          weder eine Route (/patients/new) noch einen api.js-Aufruf dafuer
+          gibt. Der Weg zur Benutzerverwaltung (#54) steht jetzt in der
+          Navigation in `Layout.jsx` — er fuehrt woanders hin und ist damit
+          keine Aktion auf dieser Liste. */}
+      <PageHeader
+        title="Patientenübersicht"
+        count={
+          !error && patients !== null
+            ? `${total} ${total === 1 ? "Patient" : "Patienten"}`
+            : null
+        }
+      />
 
       <Box sx={{ marginBlockEnd: 2 }}>
         <PatientSearch onSearch={handleSearch} />

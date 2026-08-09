@@ -5,9 +5,16 @@ Die Naht zwischen Benutzer- und Auth-Strang: Der Login holt seinen Benutzer
 User-Model etwas, bleibt es damit in diesem Modul.
 """
 
-from sqlmodel import Session, select
+from sqlalchemy import func
+from sqlmodel import Session, col, select
 
+from app.core.security import hash_password
 from app.modules.users.models import User
+from app.modules.users.schemas import UserCreate, UserUpdate
+
+# Dieselbe Obergrenze wie bei den Patienten, aus demselben Grund: Ein
+# versehentliches `limit=100000` soll die Liste nicht lahmlegen.
+MAX_LIMIT = 100
 
 
 def normalize_email(email: str) -> str:
@@ -29,6 +36,63 @@ def get_by_email(session: Session, email: str) -> User | None:
     return session.exec(
         select(User).where(User.email == normalize_email(email))
     ).first()
+
+
+def list_all(
+    session: Session, limit: int = 25, offset: int = 0
+) -> tuple[list[User], int]:
+    """Benutzer für die Verwaltung, nach Namen sortiert, seitenweise.
+
+    **Deaktivierte sind dabei.** Sie sind der Grund, warum es diese Liste gibt:
+    Wer nicht sieht, wen er stillgelegt hat, kann es auch nicht zurücknehmen.
+    Sichtbar bleibt der Zustand über `is_active` in `UserAdminView`.
+
+    Gibt den Ausschnitt und die Gesamtzahl zurück — letztere ohne
+    `limit`/`offset`, weil das Frontend daraus die Seitenzahl bildet.
+    """
+    limit = max(1, min(limit, MAX_LIMIT))
+    offset = max(0, offset)
+
+    rows = (
+        select(User).order_by(col(User.name), col(User.id)).limit(limit).offset(offset)
+    )
+    total = select(func.count()).select_from(User)
+
+    return list(session.exec(rows).all()), session.exec(total).one()
+
+
+def create(session: Session, data: UserCreate) -> User:
+    """Legt einen Benutzer an und hasht dabei sein Passwort.
+
+    Die E-Mail wird normalisiert gespeichert — dieselbe Regel wie im Seed,
+    sonst könnte sich der Angelegte mit seiner eigenen Schreibweise nicht
+    anmelden.
+    """
+    user = User(
+        email=normalize_email(data.email),
+        name=data.name,
+        password_hash=hash_password(data.password),
+        role=data.role,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+def update(session: Session, user: User, data: UserUpdate) -> User:
+    """Setzt nur die Felder, die tatsächlich mitgeschickt wurden.
+
+    `exclude_unset`, damit ein weggelassenes Feld unverändert bleibt und nicht
+    auf seinen Default zurückfällt — sonst würde ein reiner Rollenwechsel
+    nebenbei `is_active` überschreiben.
+    """
+    for feld, wert in data.model_dump(exclude_unset=True).items():
+        setattr(user, feld, wert)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
 
 
 def get_by_id(session: Session, user_id: int) -> User | None:

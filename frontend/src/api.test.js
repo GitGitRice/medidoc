@@ -5,8 +5,11 @@ import {
   apiRequest,
   FORBIDDEN_ERROR,
   getCurrentUser,
+  jsonBody,
   login,
   patientsPath,
+  userPath,
+  usersPath,
 } from "./api.js";
 
 afterEach(() => {
@@ -76,6 +79,30 @@ describe("patientsPath", () => {
     expect(patientsPath({ q: "", limit: 25, offset: 0 })).toBe(
       "/patients?limit=25&offset=0",
     );
+  });
+});
+
+describe("usersPath", () => {
+  it("zeigt ohne Parameter auf die Benutzerliste", () => {
+    expect(usersPath()).toBe("/users");
+  });
+
+  it("hängt Seitengröße und Offset als Query an", () => {
+    expect(usersPath({ limit: 25, offset: 25 })).toBe("/users?limit=25&offset=25");
+  });
+
+  it("zeigt auf einen einzelnen Benutzer", () => {
+    expect(userPath(7)).toBe("/users/7");
+  });
+});
+
+describe("jsonBody", () => {
+  it("setzt Methode, Content-Type und den Rumpf als JSON", () => {
+    expect(jsonBody("PATCH", { is_active: false })).toEqual({
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: '{"is_active":false}',
+    });
   });
 });
 
