@@ -29,7 +29,7 @@ const staffUser = {
   role: "staff",
 };
 
-const einPatient = {
+const patient = {
   id: 9,
   first_name: "Max",
   last_name: "Mustermann",
@@ -131,11 +131,11 @@ describe("Overview", () => {
     renderOverview();
 
     const rows = await screen.findAllByRole("row");
-    const reihenfolge = rows
+    const order = rows
       .slice(1) // erste Zeile ist die Kopfzeile
       .map((row) => within(row).getAllByRole("cell")[0].textContent);
 
-    expect(reihenfolge).toEqual(["Weber", "Albrecht", "Weber"]);
+    expect(order).toEqual(["Weber", "Albrecht", "Weber"]);
   });
 
   it("zeigt einen Hinweistext, wenn keine Patienten existieren", async () => {
@@ -221,7 +221,7 @@ describe("Overview", () => {
   });
 
   it("navigiert per Details-Button, unabhängig vom Zeilenklick", async () => {
-    apiRequest.mockResolvedValue({ items: [einPatient], total: 1, limit: 25, offset: 0 });
+    apiRequest.mockResolvedValue({ items: [patient], total: 1, limit: 25, offset: 0 });
 
     renderOverview();
 
@@ -235,7 +235,7 @@ describe("Overview", () => {
   });
 
   it("zeigt den Details-Button auch für staff", async () => {
-    apiRequest.mockResolvedValue({ items: [einPatient], total: 1, limit: 25, offset: 0 });
+    apiRequest.mockResolvedValue({ items: [patient], total: 1, limit: 25, offset: 0 });
 
     renderOverview(staffUser);
 
