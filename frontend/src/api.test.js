@@ -68,7 +68,29 @@ describe("patientsPath", () => {
 });
 
 describe("Fehlermeldungen", () => {
-  it("übernimmt die Meldung des Backends", async () => {
+  it("übernimmt `message` aus der Antwort", async () => {
+    stubFetch({ status: 401, message: "E-Mail oder Passwort ist falsch" }, { status: 401 });
+
+    await expect(login("a@b.test", "falsch")).rejects.toMatchObject({
+      name: "ApiError",
+      message: "E-Mail oder Passwort ist falsch",
+      status: 401,
+    });
+  });
+
+  it("bevorzugt `message` gegenüber `detail`, wenn beide vorhanden sind", async () => {
+    stubFetch(
+      { detail: "veraltete Meldung", message: "aktuelle Meldung" },
+      { status: 400 },
+    );
+
+    await expect(login("a@b.test", "falsch")).rejects.toMatchObject({
+      message: "aktuelle Meldung",
+      status: 400,
+    });
+  });
+
+  it("fällt auf `detail` zurück, wenn `message` fehlt", async () => {
     stubFetch({ detail: "E-Mail oder Passwort ist falsch" }, { status: 401 });
 
     await expect(login("a@b.test", "falsch")).rejects.toMatchObject({
@@ -103,11 +125,11 @@ describe("Fehlermeldungen", () => {
     });
   });
 
-  it("nennt sie auch ohne `detail` in der Antwort", async () => {
-    // `detail` ist übergangsweise (docs/auth-api.md) — fällt es weg, darf beim
-    // Benutzer nicht "Die Anfrage ist fehlgeschlagen." stehen. Der Fall ist
-    // immer derselbe: angemeldet, aber die Rolle reicht nicht.
-    stubFetch({ status: 403, message: "Dazu fehlt dir die Berechtigung" }, { status: 403 });
+  it("nennt sie auch ohne Meldung in der Antwort", async () => {
+    // Weder `message` noch `detail`: Dann darf beim Benutzer nicht "Die Anfrage
+    // ist fehlgeschlagen." stehen. Der Fall ist immer derselbe — angemeldet,
+    // aber die Rolle reicht nicht.
+    stubFetch({ status: 403 }, { status: 403 });
 
     await expect(
       apiRequest("/patients/1", { method: "DELETE" }),
