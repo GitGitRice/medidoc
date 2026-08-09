@@ -58,11 +58,11 @@ async function readResponse(response) {
  * dafür ist "Die Anfrage ist fehlgeschlagen." keine Auskunft.
  */
 function errorMessage(body, status) {
-  if (typeof body === "object" && typeof body?.message === "string") {
+  if (typeof body?.message === "string") {
     return body.message;
   }
 
-  if (typeof body === "object" && typeof body?.detail === "string") {
+  if (typeof body?.detail === "string") {
     return body.detail;
   }
 

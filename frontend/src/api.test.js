@@ -125,11 +125,11 @@ describe("Fehlermeldungen", () => {
     });
   });
 
-  it("nennt sie auch ohne `detail` in der Antwort", async () => {
-    // `detail` ist übergangsweise (docs/auth-api.md) — fällt es weg, darf beim
-    // Benutzer nicht "Die Anfrage ist fehlgeschlagen." stehen. Der Fall ist
-    // immer derselbe: angemeldet, aber die Rolle reicht nicht.
-    stubFetch({ status: 403, message: "Dazu fehlt dir die Berechtigung" }, { status: 403 });
+  it("nennt sie auch ohne Meldung in der Antwort", async () => {
+    // Weder `message` noch `detail`: Dann darf beim Benutzer nicht "Die Anfrage
+    // ist fehlgeschlagen." stehen. Der Fall ist immer derselbe — angemeldet,
+    // aber die Rolle reicht nicht.
+    stubFetch({ status: 403 }, { status: 403 });
 
     await expect(
       apiRequest("/patients/1", { method: "DELETE" }),
