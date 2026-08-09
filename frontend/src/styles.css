@@ -1,7 +1,7 @@
 /* Bewusst neutral. Produktfarben und endgültiges Layout stehen noch nicht fest. */
 :root {
   font-family: system-ui, sans-serif;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 body {

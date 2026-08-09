@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, Link } from "react-router-dom";
 
 import { useAuth } from "./auth/AuthContext.jsx";
 
@@ -12,6 +12,7 @@ export function Layout() {
         <h1>MediDoc</h1>
         <nav>
           <NavLink to="/">Patientenübersicht</NavLink>
+          <Link to="/patients/1">Patient 1</Link>
         </nav>
         <button type="button" onClick={logout}>
           Abmelden
