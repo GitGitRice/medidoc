@@ -24,14 +24,21 @@ export default function PatientDetail( { patient } ) {
       timeZone: "Europe/Berlin",
     }).format(parsedDate);
   };
+
+  const displayValue = (value) => {
+    if (value === null || value === undefined || value === "") {
+      return "";
+    }
+    return value;
+  };
   return (
     <div style={styles.patient_page}>
       <section style={styles.patient_card}>
         <div style={styles.patient_header}>
           <div>
-            <p style={styles.patient_eyebrow}>PATIENT #{patient.id}</p>
+            <p style={styles.patient_eyebrow}>PATIENT #{displayValue(patient.id)}</p>
             <h1 style={styles.patient_title}>
-              {patient.first_name} {patient.last_name}
+              {displayValue(patient.first_name)} {displayValue(patient.last_name)}
             </h1>
             <p style={styles.patient_subtitle}>
               Geboren am {formatDate(patient.date_of_birth)}
@@ -39,9 +46,9 @@ export default function PatientDetail( { patient } ) {
           </div>
 
           <span style={styles.patient_badge}>
-            {patient.insurance_type === "statutory"
+            {displayValue(patient.insurance_type === "statutory"
               ? "Gesetzlich versichert"
-              : "Privat versichert"}
+              : "Privat versichert")}
           </span>
         </div>
 
@@ -54,8 +61,8 @@ export default function PatientDetail( { patient } ) {
             <InfoField
               label="E-Mail"
               value={
-                <a href={`mailto:${patient.email}`} style={styles.link}>
-                  {patient.email}
+                <a href={`mailto:${displayValue(patient.email)}`} style={styles.link}>
+                  {displayValue(patient.email)}
                 </a>
               }
             />
@@ -64,17 +71,17 @@ export default function PatientDetail( { patient } ) {
               label="Telefon"
               value={
                 <a
-                  href={`tel:${patient.phone.replace(/\s/g, "")}`}
+                  href={`tel:${displayValue(patient.phone.replace(/\s/g, ""))}`}
                   style={styles.patient_link}
                 >
-                  {patient.phone}
+                  {displayValue(patient.phone)}
                 </a>
               }
             />
 
             <InfoField
               label="Adresse"
-              value={`${patient.street}, ${patient.postal_code} ${patient.city}`}
+              value={`${displayValue(patient.street)}, ${displayValue(patient.postal_code)} ${displayValue(patient.city)}`}
               fullWidth
             />
           </div>
@@ -86,19 +93,19 @@ export default function PatientDetail( { patient } ) {
           <div style={styles.patient_grid}>
             <InfoField
               label="Krankenkasse"
-              value={patient.insurance_provider}
+              value={displayValue(patient.insurance_provider)}
             />
 
             <InfoField
               label="Versicherungsnummer"
-              value={patient.insurance_number}
+              value={displayValue(patient.insurance_number)}
             />
           </div>
         </div>
 
         <div style={styles.patient_section}>
           <h2 style={styles.patient_sectionTitle}>Notizen</h2>
-          <div style={styles.patient_notes}>{patient.notes}</div>
+          <div style={styles.patient_notes}>{displayValue(patient.notes)}</div>
         </div>
 
         <div style={styles.patient_footer}>

@@ -4,18 +4,36 @@ import { useNavigate } from 'react-router-dom';
 import DeleteConfirmDialog from "./dialogs/DeleteConfirmDialog";
 
 function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit, onUpdateDocument }) {
-    // Lokaler State für Edit-Formular
+  
+  function normalizeTags(tags) {
+    if (Array.isArray(tags)) {
+      return tags;
+    }
+
+    if (typeof tags === "string") {
+      return tags
+        .split(",")
+        .map(tag => tag.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  } 
+
+  const normalizedTags = normalizeTags(document.tags);
+
   const [editTitle, setEditTitle] = useState(document.title || '');
   const [editDescription, setEditDescription] = useState(document.description || '');
-  const [editTags, setEditTags] = useState(document.tags || '');
+  const [editTags, setEditTags] = useState(normalizedTags.join(", "));
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
 
   // Wenn Item sich ändert, Formular-Werte aktualisieren
   useEffect(() => {
     setEditTitle(document.title);
     setEditDescription(document.description || '');
-    setEditTags(document.tags || []);
+    setEditTags(normalizedTags.join(", "));
   }, [document]);
 
   //Dialog Handler
@@ -54,7 +72,7 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
   // new Date() erzeugt ein Datumsobjekt aus dem ISO-String
   // toLocaleDateString formatiert es nach deutschen Konventionen
   // die Optionen bestimmen das Format: 01.01.2024
-  const formattedDate = new Date(document.createdAt).toLocaleDateString('de-DE', {
+  const formattedDate = new Date(document.created_at).toLocaleDateString('de-DE', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric'
@@ -110,6 +128,11 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
    <article className="item-card">
       <div className="item-card-header">
         <h3 className="item-title">{document.title}</h3>
+            {document.document_type && (
+              <span className="document-type-badge">
+                  {document.document_type}
+              </span>
+             )}
       </div>
 
       {document.description && (
@@ -120,9 +143,9 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
 
       {document.tags && document.tags.length > 0 && (
         <div className="item-tags">
-          {document.tags?.split(',').map(tag => (
+          {normalizedTags.map(tag => (
             <span key={tag.trim()} className="tag">{tag}</span>
-          )) || '' }
+          )) }
         </div>
       )}
 

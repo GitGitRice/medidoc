@@ -20,6 +20,7 @@ export function PatientDetailPage() {
 
   const [searchTextDocuments, setSearchTextDocuments] = useState("");
   const [searchTagDocuments, setSearchTagDocuments] = useState("");
+  const [searchTypeDocuments, setSearchTypeDocuments] = useState("");
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [editingId, setEditingId] = useState(null);
   
@@ -32,11 +33,11 @@ export function PatientDetailPage() {
   console.log("PatientId:   ", patientId );
 
   async function getPatient(patientId) {
-  return patientsAll.find((p) => p.id === Number(patientId));
+    return patientsAll.find((p) => p.id === Number(patientId));
   }
 
   async function getDocuments(patientId) {
-    return documentsAll.filter((d) => d.patientId === Number(patientId));
+    return documentsAll.filter((d) => d.patient_id === Number(patientId));
   }
 
   async function loadPatientWithDocuments(patientId) {
@@ -117,7 +118,7 @@ export function PatientDetailPage() {
     const filteredDocuments = documents.filter( document => {
 
     const searchTextLowerCase = searchTextDocuments.trim().toLowerCase();
-    if(searchTextLowerCase === "" && searchTagDocuments === "") {
+    if(searchTextLowerCase === "") {
       return true; 
     }
 
@@ -125,9 +126,13 @@ export function PatientDetailPage() {
       
     if (searchTextLowerCase.length > 0) {
         const titleMatchBySearchText = document.title.trim().toLowerCase().includes(searchTextLowerCase);
-        const tagMatchBySearchText = document.tags == null ? 
-                  false : document.tags.toLowerCase().includes(searchTextLowerCase);
-          textMatch = titleMatchBySearchText || tagMatchBySearchText;
+        const tagMatchBySearchText = document.tags === null ? 
+                  false : document.tags.join(', ').toLowerCase().includes(searchTextLowerCase);
+        const typeMatchBySearchText = document.document_type === null ? 
+                  false : document.document_type.toLowerCase().includes(searchTextLowerCase);         
+          textMatch = titleMatchBySearchText 
+                    || tagMatchBySearchText
+                    || typeMatchBySearchText;
     }
 
       return textMatch;
@@ -162,8 +167,7 @@ export function PatientDetailPage() {
               </div>
             )}  
       </div> )
-  return ( 
-       
+  return (        
             <div className="app-main">
              <aside className="app-sidebar">
               {loading ? (
@@ -181,7 +185,7 @@ export function PatientDetailPage() {
 
                 <input
                   type="text"
-                  placeholder="Suche in Titel, Tags"
+                  placeholder="Suche in Titel, Tags und Dokumenttyp"
                   className="search-input"
                   value={searchTextDocuments}
                   onChange={(e) => setSearchTextDocuments(e.target.value)}
@@ -196,7 +200,6 @@ export function PatientDetailPage() {
               <DocumentList
                 documents = {filteredDocuments}
                 searchTextDocuments={searchTextDocuments}
-                searchTagIDocuments={searchTagDocuments}
                 error={error}
                 editingId={editingId}
                 onDelete={handleDeleteDocument}

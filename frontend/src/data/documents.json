@@ -1,82 +1,214 @@
 [
   {
-    "id": 1,
-    "patientId": 1,
+    "id": "a1b2c3d4e5f678901234567890abcdef",
+    "patient_id": 1,
+    "document_type": "befund",
+    "title": "Orthopädischer Befund",
+    "description": "Untersuchung wegen anhaltender Rückenschmerzen.",
+    "tags": [
+      "orthopädie",
+      "rückenschmerzen",
+      "lws"
+    ],
+    "source": "Orthopädie Köln Mitte",
+    "fields": {
+      "diagnose": "Lumbalgie",
+      "region": "Lendenwirbelsäule"
+    },
+    "attachment": {
+      "filename": "orthopaedie_befund.pdf",
+      "content_type": "application/pdf",
+      "size_bytes": 184532
+    },
+    "created_at": "2026-08-01T08:15:22.000Z"
+  },
+  {
+    "id": "b2c3d4e5f678901234567890abcdef12",
+    "patient_id": 1,
+    "document_type": "laborwert",
+    "title": "Großes Blutbild",
+    "description": "Routinekontrolle der Blutwerte.",
+    "tags": [
+      "labor",
+      "blutbild",
+      "routine"
+    ],
+    "source": "Labor Köln",
+    "fields": {
+      "haemoglobin": "14.2 g/dl",
+      "leukozyten": "6.8 /nl"
+    },
+    "attachment": null,
+    "created_at": "2026-08-03T10:32:11.000Z"
+  },
+  {
+    "id": "c3d4e5f678901234567890abcdef1234",
+    "patient_id": 2,
+    "document_type": "arztbrief",
     "title": "Arztbrief Kardiologie",
-    "important": false,
-    "description": "Zusammenfassung der stationären Behandlung mit Empfehlungen für die Nachsorge.",
-    "tags": "Herz,Kardiologie,Blutdruck"
+    "description": "Zusammenfassung der kardiologischen Untersuchung.",
+    "tags": [
+      "kardiologie",
+      "ekg",
+      "kontrolle"
+    ],
+    "source": "Kardiologie am Rhein",
+    "fields": {
+      "diagnose": "Arterielle Hypertonie",
+      "empfehlung": "Blutdruckkontrolle"
+    },
+    "attachment": {
+      "filename": "arztbrief_kardiologie.pdf",
+      "content_type": "application/pdf",
+      "size_bytes": 265411
+    },
+    "created_at": "2026-07-22T12:41:00.000Z"
   },
   {
-    "id": 2,
-    "patientId": 1,
-    "title": "Laborbefund",
-    "important": false,
-    "description": "Blutbild und Entzündungsparameter ohne auffällige Befunde.",
-    "tags": "Labor,Blutbild,CRP"
+    "id": "d4e5f678901234567890abcdef123456",
+    "patient_id": 2,
+    "document_type": "befund",
+    "title": "EKG Befund",
+    "description": "Ruhe-EKG ohne akute Auffälligkeiten.",
+    "tags": [
+      "ekg",
+      "herz",
+      "kardiologie"
+    ],
+    "source": "Kardiologie am Rhein",
+    "fields": {
+      "rhythmus": "Sinusrhythmus",
+      "herzfrequenz": "72/min"
+    },
+    "attachment": null,
+    "created_at": "2026-07-22T12:45:00.000Z"
   },
   {
-    "id": 3,
-    "patientId": 1,
-    "title": "Röntgen Thorax",
-    "important": false,
-    "description": "Röntgenaufnahme des Brustkorbs zur Kontrolle der Lunge.",
-    "tags": "Radiologie,Lunge,Thorax"
+    "id": "e5f678901234567890abcdef12345678",
+    "patient_id": 3,
+    "document_type": "befund",
+    "title": "Radiologischer Befund Knie",
+    "description": "MRT des rechten Kniegelenks.",
+    "tags": [
+      "radiologie",
+      "mrt",
+      "knie"
+    ],
+    "source": "Radiologie Mitte",
+    "fields": {
+      "koerperregion": "Knie rechts",
+      "verfahren": "MRT",
+      "befund": "Leichte degenerative Veränderungen"
+    },
+    "attachment": {
+      "filename": "mrt_knie_rechts.pdf",
+      "content_type": "application/pdf",
+      "size_bytes": 412887
+    },
+    "created_at": "2026-07-18T09:17:45.000Z"
   },
   {
-    "id": 4,
-    "patientId": 2,
-    "title": "Entlassungsbericht",
-    "important": false,
-    "description": "Abschlussbericht nach stationärem Aufenthalt.",
-    "tags": "Entlassung,Therapie,Nachsorge"
+    "id": "f678901234567890abcdef1234567890",
+    "patient_id": 3,
+    "document_type": "sonstiges",
+    "title": "Physiotherapie Verordnung",
+    "description": null,
+    "tags": [
+      "physiotherapie",
+      "knie",
+      "therapie"
+    ],
+    "source": "Hausarztpraxis Innenstadt",
+    "fields": {
+      "einheiten": 6,
+      "behandlung": "Krankengymnastik"
+    },
+    "attachment": null,
+    "created_at": "2026-07-19T11:03:00.000Z"
   },
   {
-    "id": 5,
-    "patientId": 3,
-    "title": "MRT Knie",
-    "important": false,
-    "description": "MRT zur Abklärung von Schmerzen im rechten Knie.",
-    "tags": "Orthopädie,MRT,Knie"
+    "id": "078901234567890abcdef123456789ab",
+    "patient_id": 4,
+    "document_type": "laborwert",
+    "title": "Schilddrüsenwerte",
+    "description": "Kontrolle von TSH, fT3 und fT4.",
+    "tags": [
+      "labor",
+      "schilddrüse",
+      "tsh"
+    ],
+    "source": "Laborzentrum Köln",
+    "fields": {
+      "tsh": "2.1 mIU/l",
+      "ft3": "3.4 pg/ml",
+      "ft4": "1.2 ng/dl"
+    },
+    "attachment": {
+      "filename": "schilddruesenwerte.pdf",
+      "content_type": "application/pdf",
+      "size_bytes": 96542
+    },
+    "created_at": "2026-06-29T07:50:12.000Z"
   },
   {
-    "id": 6,
-    "patientId": 3,
-    "title": "Physiotherapie Bericht",
-    "important": false,
-    "description": "Dokumentation der bisherigen Therapiefortschritte.",
-    "tags": "Physiotherapie,Bewegung,Rehabilitation"
+    "id": "18901234567890abcdef123456789abc",
+    "patient_id": 4,
+    "document_type": "arztbrief",
+    "title": "Endokrinologischer Arztbrief",
+    "description": "Kontrolltermin bei bekannter Schilddrüsenerkrankung.",
+    "tags": [
+      "endokrinologie",
+      "schilddrüse",
+      "kontrolle"
+    ],
+    "source": "Endokrinologie Köln",
+    "fields": {
+      "diagnose": "Hypothyreose",
+      "medikation": "Levothyroxin"
+    },
+    "attachment": null,
+    "created_at": "2026-06-30T14:21:09.000Z"
   },
   {
-    "id": 7,
-    "patientId": 4,
-    "title": "Diabetes Verlauf",
-    "important": false,
-    "description": "Kontrolle der Blutzuckerwerte und Anpassung der Medikation.",
-    "tags": "Diabetes,Blutzucker,Medikation"
+    "id": "2901234567890abcdef123456789abcd",
+    "patient_id": 5,
+    "document_type": "befund",
+    "title": "Dermatologischer Befund",
+    "description": "Kontrolle eines auffälligen Hautareals am Rücken.",
+    "tags": [
+      "dermatologie",
+      "haut",
+      "kontrolle"
+    ],
+    "source": "Hautarztpraxis Köln Süd",
+    "fields": {
+      "koerperregion": "Rücken",
+      "diagnose": "Benigner Nävus"
+    },
+    "attachment": {
+      "filename": "hautbefund.pdf",
+      "content_type": "application/pdf",
+      "size_bytes": 148220
+    },
+    "created_at": "2026-08-05T13:42:30.000Z"
   },
   {
-    "id": 8,
-    "patientId": 4,
-    "title": "Augenarzt Befund",
-    "important": false,
-    "description": "Regelmäßige Kontrolle der Sehschärfe und Netzhaut.",
-    "tags": "Augenheilkunde,Sehen,Netzhaut"
-  },
-  {
-    "id": 9,
-    "patientId": 5,
-    "title": "Operationsbericht",
-    "important": false,
-    "description": "Dokumentation einer erfolgreich durchgeführten Hüftoperation.",
-    "tags": "Operation,Hüfte,Chirurgie"
-  },
-  {
-    "id": 10,
-    "patientId": 5,
-    "title": "Reha Abschluss",
-    "important": false,
-    "description": "Abschlussbericht der Rehabilitationsmaßnahme mit Empfehlungen.",
-    "tags": "Rehabilitation,Nachsorge,Mobilität"
+    "id": "301234567890abcdef123456789abcde",
+    "patient_id": 5,
+    "document_type": "sonstiges",
+    "title": "Impfbescheinigung",
+    "description": "Dokumentation der letzten Tetanus-Auffrischung.",
+    "tags": [
+      "impfung",
+      "tetanus",
+      "vorsorge"
+    ],
+    "source": "Hausarztpraxis Köln Süd",
+    "fields": {
+      "impfung": "Tetanus",
+      "impfdatum": "2026-04-14"
+    },
+    "attachment": null,
+    "created_at": "2026-04-14T16:12:00.000Z"
   }
 ]

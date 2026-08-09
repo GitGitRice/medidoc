@@ -472,3 +472,23 @@
   display: flex;
   gap: 8px;
 }
+
+.document-type-badge {
+  flex-shrink: 0;
+
+  padding: 6px 10px;
+
+  background-color: #ecfdf5;
+  color: #047857;
+;
+
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  white-space: nowrap;
+
+  text-transform: capitalize;
+}
