@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 
+import { useAuth } from "../auth/AuthContext";
 import DeleteConfirmDialog from "./dialogs/DeleteConfirmDialog";
 
 function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit, onUpdateDocument }) {
+  const { hasRole } = useAuth();
+  const canDelete = hasRole("admin");
   
   function normalizeTags(tags) {
     if (Array.isArray(tags)) {
@@ -167,22 +169,26 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
               Bearbeiten
             </button>
           
-            <button  
-              className="delete-btn" 
-              onClick={() => handleDeleteClick()}
-            >
-              Löschen
-            </button>
+            {canDelete && (
+              <button
+                className="delete-btn"
+                onClick={handleDeleteClick}
+              >
+                Löschen
+              </button>
+            )}
           </div>
         </div>
 
-        <DeleteConfirmDialog
-          open={deleteDialogOpen}
-          title="Dokument löschen?"
-          message={`Möchtest du "${document.title}" wirklich löschen?`}
-          onCancel={handleCancelDelete}
-          onConfirm={handleConfirmDelete}
-        />
+        {canDelete && (
+          <DeleteConfirmDialog
+            open={deleteDialogOpen}
+            title="Dokument löschen?"
+            message={`Möchtest du "${document.title}" wirklich löschen?`}
+            onCancel={handleCancelDelete}
+            onConfirm={handleConfirmDelete}
+          />
+        )}
 
       </div>
     </article>

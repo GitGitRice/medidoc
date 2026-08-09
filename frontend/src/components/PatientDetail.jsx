@@ -71,7 +71,7 @@ export default function PatientDetail( { patient } ) {
               label="Telefon"
               value={
                 <a
-                  href={`tel:${displayValue(patient.phone.replace(/\s/g, ""))}`}
+                  href={`tel:${displayValue(patient.phone).replace(/\s/g, "")}`}
                   style={styles.patient_link}
                 >
                   {displayValue(patient.phone)}

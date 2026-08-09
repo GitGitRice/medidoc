@@ -4,16 +4,13 @@ import PatientDetail from '../components/PatientDetail';
 import '../css/PatientDetailPage.css';
 
 import { useEffect, useState } from 'react';
-
 import { useParams } from "react-router-dom";
-
-import patientsAll from "../data/patients.json";
-import documentsAll from "../data/documents.json";
-
+import { useAuth } from "../auth/AuthContext";
 
 export function PatientDetailPage() {
 
   const { patientId } = useParams();
+  const { apiFetch } = useAuth();
 
   const [patient, setPatient] = useState(null);
   const [documents, setDocuments] = useState([]);
@@ -32,40 +29,43 @@ export function PatientDetailPage() {
 
   console.log("PatientId:   ", patientId );
 
-  async function getPatient(patientId) {
-    return patientsAll.find((p) => p.id === Number(patientId));
-  }
+  useEffect(() => {
+  const controller = new AbortController();
 
-  async function getDocuments(patientId) {
-    return documentsAll.filter((d) => d.patient_id === Number(patientId));
-  }
-
-  async function loadPatientWithDocuments(patientId) {
+  async function loadPatientWithDocuments() {
     try {
       setLoading(true);
       setError(null);
-      const patientData = await getPatient(patientId);
 
-      if (!patientData || !patientData.id) {
-        throw new Error("Patient nicht gefunden");
-      }
-      
-      console.log("Loading Patient: ", patientData)
-      
+      const [patientData, documentsPage] = await Promise.all([
+        apiFetch(`/patients/${patientId}`, {
+          signal: controller.signal,
+        }),
+        apiFetch(`/docs/${patientId}?limit=100&offset=0`, {
+          signal: controller.signal,
+        }),
+      ]);
+
       setPatient(patientData);
-      
-      const doccumentsData = await getDocuments(patientId);
-      console.log("Loading Documents: ", doccumentsData)
-      
-      setDocuments(doccumentsData);
-    
-    } catch (err) {
-      console.error("Fehler beim Laden:", err);
-      setError("Patient und/oder Dokumente konnten nicht geladen werden. Läuft das Backend?");
+      setDocuments(documentsPage.items);
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        setError(
+          error.message ??
+            "Patient und Dokumente konnten nicht geladen werden.",
+        );
+      }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }
+
+    loadPatientWithDocuments();
+
+    return () => controller.abort();
+  }, [patientId, apiFetch]);
 
   async function handleDeleteDocument(id) {
     try {
@@ -110,11 +110,6 @@ export function PatientDetailPage() {
       setEditingId(null);
     }
 
-    useEffect(() => {
-      loadPatientWithDocuments(patientId) 
-    }, []);
-
-  
     const filteredDocuments = documents.filter( document => {
 
     const searchTextLowerCase = searchTextDocuments.trim().toLowerCase();
@@ -181,8 +176,6 @@ export function PatientDetailPage() {
             <section className="app-content">
              
             <div className="search-box">
-                <span className="search-icon">⌕</span>
-
                 <input
                   type="text"
                   placeholder="Suche in Titel, Tags und Dokumenttyp"
