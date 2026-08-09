@@ -45,16 +45,23 @@ async function readResponse(response) {
 /**
  * Die Meldung aus einer Fehlerantwort — oder ein neutraler Satz.
  *
- * `detail` ist bei uns ein String (docs/auth-api.md). FastAPI selbst antwortet
- * bei einem Validierungsfehler aber mit einer *Liste* von Objekten unter
- * demselben Schlüssel. Ungeprüft übernommen stünde davon "[object Object]" in
- * der Oberfläche, deshalb wird hier auf einen String bestanden.
+ * `message` ist unser eigenes Feld (app/core/errors.py) und bei jeder eigenen
+ * Fehlerantwort ein String — das ist der Weg, auf den die Backend-Doku selbst
+ * verweist. `detail` bleibt als Fallback für Antworten, die (noch) kein
+ * `message` mitbringen. Roh-FastAPI liefert bei einem Validierungsfehler dort
+ * eine *Liste* von Objekten unter demselben Schlüssel — ungeprüft übernommen
+ * stünde davon "[object Object]" in der Oberfläche, deshalb wird auf einen
+ * String bestanden.
  *
  * Bei `403` steht die Meldung auch dann fest, wenn die Antwort keine mitbringt:
  * Der Fall ist immer derselbe — angemeldet, aber die Rolle reicht nicht — und
  * dafür ist "Die Anfrage ist fehlgeschlagen." keine Auskunft.
  */
 function errorMessage(body, status) {
+  if (typeof body === "object" && typeof body?.message === "string") {
+    return body.message;
+  }
+
   if (typeof body === "object" && typeof body?.detail === "string") {
     return body.detail;
   }
