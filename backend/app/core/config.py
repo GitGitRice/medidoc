@@ -1,11 +1,15 @@
 from pathlib import Path
 from urllib.parse import quote_plus
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # app/core/config.py -> app/core -> app -> backend -> Repo-Wurzel.
 # Beim Verschieben dieser Datei muss die Zahl mitwandern.
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# Wohin Uploads gehen, wenn nichts anderes gesetzt ist.
+DEFAULT_UPLOAD_DIR = REPO_ROOT / "uploads"
 
 
 class Settings(BaseSettings):
@@ -42,6 +46,22 @@ class Settings(BaseSettings):
     # Trail läuft in den Speicher. Die Anwendung startet in beiden Fällen.
     mongo_url: str = ""
     mongo_db: str = "medidoc"
+
+    # Dokumente, siehe docs/documents-api.md.
+    # Wohin die Anhänge geschrieben werden. Im Container ein Docker-Volume,
+    # lokal ein Ordner neben dem Code. Nur die Bytes liegen hier — die Angaben
+    # zum Dokument stehen in MongoDB (ADR-0002).
+    #
+    # Die beiden Namen bleiben `UPLOAD_DIR` und `MAX_UPLOAD_BYTES`, obwohl der
+    # fachliche Begriff **Anhang** heißt: Sie beschreiben die Ablage, also die
+    # Seite, auf der „Datei" das richtige Wort ist (backend/README.md). Sie
+    # stehen außerdem in jeder .env und in docker-compose.yml — ein Umbenennen
+    # wäre eine Änderung an der Betriebsschnittstelle für einen Gewinn an
+    # Wortwahl.
+    upload_dir: str = str(DEFAULT_UPLOAD_DIR)
+    # 20 MB. Ein Scan aus der Praxis liegt weit darunter; darüber ist es
+    # entweder ein Versehen oder nichts, was in eine Akte gehört.
+    max_upload_bytes: int = 20 * 1024 * 1024
     # Aufbewahrung. Mongo räumt selbst auf (TTL-Index), niemand muss putzen.
     audit_retention_days: int = 30
 
@@ -53,6 +73,17 @@ class Settings(BaseSettings):
     abuse_rejected_tokens_per_ip: int = 10
     abuse_forbidden_per_user: int = 3
     abuse_not_found_per_user: int = 20
+
+    @field_validator("upload_dir")
+    @classmethod
+    def _blank_upload_dir_falls_back_to_default(cls, value: str) -> str:
+        """`UPLOAD_DIR=` in der .env soll nicht ins Arbeitsverzeichnis schreiben.
+
+        Eine leer gelassene Variable überschreibt den Standardwert sonst mit
+        einem leeren String — und `Path("")` ist der Ordner, in dem der Prozess
+        gerade steht. Das wäre hier das Repo selbst.
+        """
+        return value.strip() or str(DEFAULT_UPLOAD_DIR)
 
     @property
     def database_url(self) -> str:

@@ -81,7 +81,7 @@ Ein Issue ist fertig, wenn:
   verhindert vier halbfertige Branches am Freitagmorgen.
 - **Ein Issue = maximal ein Tag.** Was länger dauert, sind zwei Issues. Nur so hat das
   Daily Stand-up jeden Tag etwas zu berichten.
-- **Projekttagebuch** in der README täglich vor Feierabend ergänzen.
+- **Projekttagebuch** in [docs/Diary.md](./Diary.md) täglich vor Feierabend ergänzen.
 
 ## Offene Punkte für Montag
 

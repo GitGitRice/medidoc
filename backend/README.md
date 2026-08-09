@@ -7,6 +7,7 @@ FastAPI + SQLModel gegen PostgreSQL.
 | Fachliche Begriffe | [CONTEXT.md](../CONTEXT.md) |
 | Patienten-API | [docs/patients-api.md](../docs/patients-api.md) |
 | Auth-API | [docs/auth-api.md](../docs/auth-api.md) |
+| Dokumente-API | [docs/documents-api.md](../docs/documents-api.md) |
 | Logging und Monitoring | [docs/logging-monitoring.md](../docs/logging-monitoring.md) |
 | Entscheidungen | [docs/adr/](../docs/adr/) |
 
@@ -77,6 +78,7 @@ beim Import, auch im Test.
 | [tests/test_auth_authorization.py](tests/test_auth_authorization.py) | Token-Prüfung und Rollen, für **alle** Patienten-Routen auf einmal |
 | [tests/test_patients_api.py](tests/test_patients_api.py) | Patienten-Endpunkte, gegliedert nach Endpunkt |
 | [tests/test_audit.py](tests/test_audit.py) | Audit-Trail, Datensparsamkeit, Missbrauchserkennung, Monitoring |
+| [tests/test_documents_api.py](tests/test_documents_api.py) | Dokumente je Patient, Dokumenttyp, Anhang (auch ohne), 20-MB-Grenze, Ablage |
 
 Was sich gegen SQLite **nicht** prüfen lässt, steht als Kommentar im jeweiligen Testkopf.
 Der wichtigste Fall: SQLite ignoriert die Groß-/Kleinschreibung nur bei ASCII-Zeichen, die
@@ -112,6 +114,7 @@ backend/
         ├── patients/    Strang B — Tiran
         ├── users/       Benutzer-Model, Verwaltung ist Sprint 2
         ├── auth/        Strang C — Steven
+        ├── documents/   Dokumente je Patient (MongoDB + Volume)
         └── audit/       Audit-Trail und Missbrauchserkennung (MongoDB)
 ```
 
@@ -125,9 +128,22 @@ Jedes Modul hat, was es braucht, immer unter demselben Namen:
 | `router.py` | Endpunkte | ja |
 | `seed.py` | Testdaten des Moduls | nein |
 
-Eine Ausnahme: `modules/audit/` hat `store.py` statt `models.py` — sein Trail liegt in
-MongoDB, nicht in Postgres, und hat deshalb keine SQLModel-Tabelle
-([ADR-0007](../docs/adr/0007-mongodb-fuer-audit-und-monitoring.md)).
+Zwei Ausnahmen, beide aus demselben Grund — ihre Daten liegen in MongoDB, nicht in
+Postgres, und haben deshalb keine SQLModel-Tabelle:
+
+| Modul | Statt `models.py` | Warum |
+| ----- | ----------------- | ----- |
+| `modules/audit/` | `store.py` | der Trail liegt in MongoDB ([ADR-0007](../docs/adr/0007-mongodb-fuer-audit-und-monitoring.md)) |
+| `modules/documents/` | `store.py` **und** zusätzlich `storage.py` | die Angaben zum Dokument liegen in MongoDB, die Bytes eines Anhangs auf einem Volume ([ADR-0002](../docs/adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)) |
+
+`documents/storage.py` ist die einzige Datei, die Bytes auf die Platte schreibt. Sie steht
+neben `service.py` und nicht darin, weil sie etwas anderes tut: `service.py` entscheidet,
+`storage.py` schreibt. Sie ist auch die einzige Stelle, an der „Datei" das richtige Wort
+ist — überall sonst heißt der fachliche Begriff **Anhang**
+([CONTEXT.md](../CONTEXT.md), [docs/documents-api.md](../docs/documents-api.md#namensgebung)).
+Das gilt für die deutsche Prosa. Englische Bezeichner folgen der Regel „JSON-Keys und
+Formularfelder sind englisch": `attachment` ist die Übersetzung von **Anhang** und damit
+richtig, ebenso `UPLOAD_DIR` und `MAX_UPLOAD_BYTES` als Namen der Ablage.
 
 Die eine Regel, die den Rest trägt: **`service.py` kennt kein HTTP.** Keine
 `HTTPException`, keine Statuscodes, keine `Depends`. Der Router übersetzt zwischen beidem.
@@ -204,23 +220,50 @@ Felder, Beispielantworten, Fehlerfälle, Hinweise fürs Frontend. Hier nur der �
 
 | Methode | Pfad | Zweck | Verlangt |
 | ------- | ---- | ----- | -------- |
-| `GET` | `/patienten?suche=&limit=&offset=` | Patientenübersicht, durchsuchbar und seitenweise | Token |
-| `POST` | `/patienten` | anlegen → `201` | Token |
-| `GET` | `/patienten/{id}` | Stammdaten | Token |
-| `PATCH` | `/patienten/{id}` | einzelne Felder ändern | Token |
-| `DELETE` | `/patienten/{id}` | endgültig löschen → `204` | Token + `admin` |
+| `GET` | `/patients?q=&limit=&offset=` | Patientenübersicht, durchsuchbar und seitenweise | Token |
+| `POST` | `/patients` | anlegen → `201` | Token |
+| `GET` | `/patients/{id}` | Stammdaten | Token |
+| `PATCH` | `/patients/{id}` | einzelne Felder ändern | Token |
+| `DELETE` | `/patients/{id}` | endgültig löschen → `204` | Token + `admin` |
 
 Drei Dinge, die beim Lesen des Codes sonst überraschen:
 
 - **Nur drei Pflichtfelder** — `first_name`, `last_name`, `date_of_birth`. Ein Patient
   ohne Telefonnummer und ohne Versicherung ist gültig.
-- `GET /patienten` liefert `{ items, total, limit, offset }`, keine nackte Liste. `total`
+- `GET /patients` liefert `{ items, total, limit, offset }`, keine nackte Liste. `total`
   ist die Trefferzahl ohne Paging.
-- **Pfad und Query-Parameter sind deutsch, die JSON-Keys englisch.** Bewusste Mischung,
-  siehe [Namensgebung](../docs/patients-api.md#namensgebung).
+- **Pfad, Query-Parameter und JSON-Keys sind englisch**, deutsch sind nur Kommentare und
+  Doku — siehe [Namensgebung](../docs/patients-api.md#namensgebung).
 
 Damit die Doku nicht doppelt gepflegt werden muss: Alles Fachliche gehört nach
 `docs/patients-api.md`, hier steht nur, wie der Code aufgebaut ist.
+
+## Dokumente-API
+
+Der vollständige Vertrag steht in **[docs/documents-api.md](../docs/documents-api.md)**.
+Hier nur der Überblick:
+
+| Methode | Pfad | Zweck | Verlangt |
+| ------- | ---- | ----- | -------- |
+| `POST` | `/docs/{patient_id}` | Dokument anlegen, multipart → `201` | Token |
+| `GET` | `/docs/{patient_id}?q=&limit=&offset=` | Dokumente eines Patienten | Token |
+| `DELETE` | `/docs/{patient_id}/{document_id}` | endgültig löschen → `204` | Token + `admin` |
+
+Drei Dinge, die beim Lesen des Codes sonst überraschen:
+
+- **Ein Dokument ist nicht die Datei.** Es besteht aus Angaben, deren Felder vom
+  **Dokumenttyp** abhängen (`fields`), und **optional** einem **Anhang**. Ein Dokument ohne
+  Anhang ist gültig — so steht es in [CONTEXT.md](../CONTEXT.md), und genau daran hängt auch
+  die Begründung von ADR-0002: Ohne heterogene Angaben gäbe es keinen Grund für MongoDB.
+- **`document_type` wird gegen keine Liste geprüft.** CONTEXT.md verlangt neue
+  Dokumenttypen ohne Schemaänderung; welche üblich sind, steht in der Doku, nicht im Code.
+  Getrimmt und kleingeschrieben wird trotzdem, sonst wären `Befund` und `befund` zwei Typen.
+- **Zwei Speicher in einem Vorgang.** `service.create` schreibt erst die Bytes, dann die
+  Angaben — und nimmt die Bytes zurück, wenn der zweite Schritt scheitert. Sonst lägen
+  Anhänge auf der Platte, zu denen es kein Dokument gibt.
+
+Damit die Doku nicht doppelt gepflegt werden muss: Alles Fachliche gehört nach
+`docs/documents-api.md`, hier steht nur, wie der Code aufgebaut ist.
 
 ## Logging und Monitoring
 
@@ -248,7 +291,7 @@ nur für `admin` und nur lesend.
 ## Testdaten
 
 [`testdata/patients.json`](testdata/patients.json) — 200 frei erfundene Patienten, in
-derselben Form wie der Rumpf von `POST /patienten`. **Das Frontend kann die Datei direkt
+derselben Form wie der Rumpf von `POST /patients`. **Das Frontend kann die Datei direkt
 als Mock benutzen**, solange es noch nicht gegen die API baut.
 
 Als JSON neben dem Code und nicht als Python-Literal darin: So kommt das Frontend an
@@ -265,10 +308,6 @@ kaputter Eintrag fällt damit sofort auf und nicht erst, wenn das Frontend ihn a
 
 ## Offene Punkte
 
-- **Deutscher Pfad, englische JSON-Keys.** `/patienten` und `?suche=` stehen so im Code und
-  decken sich mit ADR-0005; die Regel in CONTEXT.md („API durchgehend englisch") tut das
-  nicht. Der Stand ist umgesetzt und dokumentiert, die Regel selbst gehört
-  **einmal im Daily nachgezogen** — entweder CONTEXT.md anpassen oder die Pfade zurückziehen.
 - **Keine Migrationen.** `create_all` legt nur fehlende Tabellen an. Für Sprint 1
   bewusst so, siehe oben.
 

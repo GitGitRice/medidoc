@@ -30,12 +30,12 @@ const staffUser = {
 };
 
 /** Eine wiederhergestellte Sitzung — der Ausgangspunkt aller Tests hier. */
-async function renderAngemeldet(angemeldet = user) {
+async function renderLoggedIn(currentUser = user) {
   window.localStorage.setItem(TOKEN_KEY, "stored-token");
-  getCurrentUser.mockResolvedValue(angemeldet);
+  getCurrentUser.mockResolvedValue(currentUser);
 
   const rendered = renderHook(() => useAuth(), { wrapper: AuthProvider });
-  await waitFor(() => expect(rendered.result.current.user).toEqual(angemeldet));
+  await waitFor(() => expect(rendered.result.current.user).toEqual(currentUser));
 
   return rendered;
 }
@@ -54,14 +54,14 @@ describe("hasRole", () => {
   });
 
   it("erkennt die Rolle admin", async () => {
-    const { result } = await renderAngemeldet();
+    const { result } = await renderLoggedIn();
 
     expect(result.current.hasRole("admin")).toBe(true);
     expect(result.current.hasRole("staff")).toBe(false);
   });
 
   it("erkennt die Rolle staff", async () => {
-    const { result } = await renderAngemeldet(staffUser);
+    const { result } = await renderLoggedIn(staffUser);
 
     expect(result.current.hasRole("staff")).toBe(true);
     expect(result.current.hasRole("admin")).toBe(false);
@@ -69,13 +69,13 @@ describe("hasRole", () => {
 
   it("prüft gegen die Menge, wenn mehrere Rollen genannt sind", async () => {
     // Wie `require_roles` im Backend: erlaubt ist, wer *eine* davon hat.
-    const { result } = await renderAngemeldet(staffUser);
+    const { result } = await renderLoggedIn(staffUser);
 
     expect(result.current.hasRole("admin", "staff")).toBe(true);
   });
 
   it("sagt nach dem Abmelden wieder nein", async () => {
-    const { result } = await renderAngemeldet();
+    const { result } = await renderLoggedIn();
 
     act(() => {
       result.current.logout();
@@ -91,7 +91,7 @@ describe("apiFetch", () => {
   });
 
   it("schickt den Token mit", async () => {
-    const { result } = await renderAngemeldet();
+    const { result } = await renderLoggedIn();
     apiRequest.mockResolvedValue({ items: [] });
 
     await act(async () => {
@@ -102,7 +102,7 @@ describe("apiFetch", () => {
   });
 
   it("meldet bei 401 ab und verwirft den gespeicherten Token", async () => {
-    const { result } = await renderAngemeldet();
+    const { result } = await renderLoggedIn();
     apiRequest.mockRejectedValue(new ApiError("Anmeldung erforderlich", 401));
 
     await act(async () => {
@@ -119,7 +119,7 @@ describe("apiFetch", () => {
   it("meldet bei 403 nicht ab und reicht die Meldung durch", async () => {
     // Da fehlt eine Rolle, nicht die Anmeldung — docs/auth-api.md. Die Meldung
     // muss beim Aufrufer ankommen, denn nur dort steht die Oberfläche.
-    const { result } = await renderAngemeldet(staffUser);
+    const { result } = await renderLoggedIn(staffUser);
     apiRequest.mockRejectedValue(new ApiError(FORBIDDEN_ERROR, 403));
 
     await act(async () => {
@@ -163,16 +163,16 @@ describe("Sitzung beim Laden", () => {
     ["ein nicht erreichbares Backend", new ApiError("Das Backend ist nicht erreichbar.", 0)],
     ["einen Serverfehler", new ApiError("Die Anfrage ist fehlgeschlagen.", 500)],
     ["eine kaputte Antwort", new TypeError("body is not valid JSON")],
-  ])("behält den Token bei %s", async (_beschreibung, fehler) => {
+  ])("behält den Token bei %s", async (_description, error) => {
     window.localStorage.setItem(TOKEN_KEY, "stored-token");
-    getCurrentUser.mockRejectedValue(fehler);
+    getCurrentUser.mockRejectedValue(error);
 
     const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(window.localStorage.getItem(TOKEN_KEY)).toBe("stored-token");
     expect(result.current.token).toBe("stored-token");
-    expect(result.current.sessionError).toBe(fehler);
+    expect(result.current.sessionError).toBe(error);
     expect(result.current.user).toBeNull();
   });
 

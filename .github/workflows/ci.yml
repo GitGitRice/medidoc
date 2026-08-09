@@ -57,3 +57,8 @@ jobs:
       - run: npm ci
 
       - run: npm test
+
+      # Die Tests laufen gegen jsdom und sagen nichts darüber, ob Vite das
+      # Frontend überhaupt bauen kann. Ohne diesen Schritt fiele ein kaputter
+      # Build erst bei der Vorführung auf.
+      - run: npm run build

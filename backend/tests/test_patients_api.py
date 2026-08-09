@@ -20,7 +20,7 @@ from datetime import date
 import pytest
 from fastapi.testclient import TestClient
 
-BASE = "/patienten"
+BASE = "/patients"
 
 PFLICHTFELDER = {
     "first_name": "Max",
@@ -30,7 +30,7 @@ PFLICHTFELDER = {
 
 
 class TestPatientLesen:
-    """GET /patienten/{id}"""
+    """GET /patients/{id}"""
 
     def test_liefert_den_patienten_zur_id(
         self, client: TestClient, admin_headers, make_patient
@@ -73,7 +73,7 @@ class TestPatientLesen:
 
 
 class TestPatientenListe:
-    """GET /patienten"""
+    """GET /patients"""
 
     def test_liefert_alle_patienten(
         self, client: TestClient, admin_headers, make_patient
@@ -111,7 +111,7 @@ class TestPatientenListe:
         make_patient(first_name="Jonas", last_name="Weber")
 
         body = client.get(
-            BASE, params={"suche": "mustermann"}, headers=admin_headers
+            BASE, params={"q": "mustermann"}, headers=admin_headers
         ).json()
 
         assert body["total"] == 1
@@ -123,7 +123,7 @@ class TestPatientenListe:
         make_patient(first_name="Max", last_name="Mustermann")
         make_patient(first_name="Jonas", last_name="Weber")
 
-        body = client.get(BASE, params={"suche": "jonas"}, headers=admin_headers).json()
+        body = client.get(BASE, params={"q": "jonas"}, headers=admin_headers).json()
 
         assert body["total"] == 1
         assert body["items"][0]["first_name"] == "Jonas"
@@ -137,7 +137,7 @@ class TestPatientenListe:
         make_patient(first_name="Max", last_name="Mustermann")
 
         body = client.get(
-            BASE, params={"suche": geschrieben_als}, headers=admin_headers
+            BASE, params={"q": geschrieben_als}, headers=admin_headers
         ).json()
 
         assert body["total"] == 1
@@ -148,7 +148,7 @@ class TestPatientenListe:
         make_patient(first_name="Friedrich", last_name="Hartmann")
 
         body = client.get(
-            BASE, params={"suche": "FRIED"}, headers=admin_headers
+            BASE, params={"q": "FRIED"}, headers=admin_headers
         ).json()
 
         assert body["total"] == 1
@@ -161,10 +161,10 @@ class TestPatientenListe:
         make_patient(first_name="Anton", last_name="Weber")
 
         vorwaerts = client.get(
-            BASE, params={"suche": "lena weber"}, headers=admin_headers
+            BASE, params={"q": "lena weber"}, headers=admin_headers
         ).json()
         rueckwaerts = client.get(
-            BASE, params={"suche": "weber lena"}, headers=admin_headers
+            BASE, params={"q": "weber lena"}, headers=admin_headers
         ).json()
 
         assert vorwaerts["total"] == rueckwaerts["total"] == 1
@@ -177,7 +177,7 @@ class TestPatientenListe:
         make_patient(first_name="Max", last_name="Mustermann")
 
         response = client.get(
-            BASE, params={"suche": "gibtesnicht"}, headers=admin_headers
+            BASE, params={"q": "gibtesnicht"}, headers=admin_headers
         )
 
         assert response.status_code == 200
@@ -198,7 +198,7 @@ class TestPatientenListe:
         make_patient()
 
         ohne = client.get(BASE, headers=admin_headers).json()
-        leer = client.get(BASE, params={"suche": ""}, headers=admin_headers).json()
+        leer = client.get(BASE, params={"q": ""}, headers=admin_headers).json()
 
         assert ohne == leer
 
@@ -208,7 +208,7 @@ class TestPatientenListe:
         """`%` ist in LIKE ein Platzhalter und muss maskiert werden."""
         make_patient(first_name="Max", last_name="Mustermann")
 
-        body = client.get(BASE, params={"suche": "%"}, headers=admin_headers).json()
+        body = client.get(BASE, params={"q": "%"}, headers=admin_headers).json()
 
         assert body["total"] == 0
 
@@ -251,7 +251,7 @@ class TestPatientenListe:
 
 
 class TestPatientAnlegen:
-    """POST /patienten"""
+    """POST /patients"""
 
     def test_legt_den_patienten_an_und_liefert_ihn_mit_id(
         self, client: TestClient, admin_headers
@@ -404,7 +404,7 @@ class TestPatientAnlegen:
 
 
 class TestPatientAendern:
-    """PATCH /patienten/{id}"""
+    """PATCH /patients/{id}"""
 
     def test_nur_mitgeschickte_felder_werden_geaendert(
         self, client: TestClient, admin_headers, make_patient
@@ -546,7 +546,7 @@ class TestPatientAendern:
 
 
 class TestPatientLoeschen:
-    """DELETE /patienten/{id}"""
+    """DELETE /patients/{id}"""
 
     def test_loescht_den_patienten_und_liefert_204(
         self, client: TestClient, admin_headers, make_patient

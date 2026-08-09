@@ -19,6 +19,10 @@ Fehlerantworten haben überall dieselbe Form (`status`, `message`), siehe
 `app/core/errors.py`. Welcher Endpunkt womit antworten kann, steht als
 `responses=` an der jeweiligen Funktion und landet damit in `/docs` — das ist
 die Fassung, die das Frontend liest.
+
+Pfad, Query-Parameter und JSON-Keys sind englisch (`/patients`, `?q=`). Deutsch
+sind nur Kommentare, Doku und die Oberfläche im Frontend — so steht die Regel in
+ADR-0005 und in beiden API-Verträgen.
 """
 
 from typing import Annotated
@@ -31,6 +35,7 @@ from app.db.session import get_session
 from app.modules.audit import service as audit
 from app.modules.audit.events import EventType
 from app.modules.auth.dependencies import get_current_user, require_roles
+from app.modules.documents import service as documents_service
 from app.modules.patients import service
 from app.modules.patients.models import Patient
 from app.modules.patients.schemas import (
@@ -42,8 +47,8 @@ from app.modules.patients.schemas import (
 from app.modules.users.models import Role, User
 
 router = APIRouter(
-    prefix="/patienten",
-    tags=["patienten"],
+    prefix="/patients",
+    tags=["patients"],
     dependencies=[Depends(get_current_user)],
 )
 
@@ -67,7 +72,7 @@ UNPROCESSABLE = {"model": ErrorResponse, "description": "Eingabe ungültig"}
 )
 def list_patients(
     session: SessionDep,
-    suche: Annotated[
+    q: Annotated[
         str | None,
         Query(
             description=(
@@ -86,9 +91,7 @@ def list_patients(
     Findet die Suche nichts, ist `items` eine leere Liste und `total` gleich
     null — das ist **kein** Fehler und wird mit `200` beantwortet.
     """
-    # Der Query-Parameter heißt deutsch wie der Pfad, die Service-Schicht
-    # englisch wie der übrige Code. Die Übersetzung passiert genau hier.
-    items, total = service.search(session, query=suche, limit=limit, offset=offset)
+    items, total = service.search(session, query=q, limit=limit, offset=offset)
     return PatientPage(items=items, total=total, limit=limit, offset=offset)
 
 
@@ -144,17 +147,17 @@ def update_patient(
     """
     patient = _get_or_404(session, patient_id)
     _reject_taken_insurance_number(session, data.insurance_number, exclude_id=patient_id)
-    geaendert = service.update(session, patient, data)
+    updated = service.update(session, patient, data)
     # Welche Felder angefasst wurden, nicht womit sie gefüllt wurden — der
     # Trail hält keine Patientendaten.
     _audit(
         request,
         EventType.PATIENT_UPDATED,
-        geaendert,
+        updated,
         status.HTTP_200_OK,
         fields=sorted(data.model_dump(exclude_unset=True)),
     )
-    return geaendert
+    return updated
 
 
 @router.delete(
@@ -173,9 +176,42 @@ def delete_patient(
     """
     patient = _get_or_404(session, patient_id)
     service.delete(session, patient)
-    # Nach dem Löschen protokolliert: Der Eintrag im Trail ist ab jetzt der
-    # einzige Beleg, dass es diesen Patienten je gab.
-    _audit(request, EventType.PATIENT_DELETED, None, status.HTTP_204_NO_CONTENT, patient_id=patient_id)
+
+    # Die Akte geht mit. Ohne das blieben Dokumente und Anhänge liegen: über
+    # die API nicht mehr erreichbar, weil jeder Dokument-Endpunkt den Patienten
+    # voraussetzt, und trotzdem auf der Platte. Zuerst der Patient, dann die
+    # Akte — bricht es dazwischen ab, bleiben verwaiste Anhänge statt eines
+    # Patienten ohne seine Dokumente.
+    #
+    # Der Trail-Eintrag darf an diesem Schritt **nicht** hängen. Der Patient ist
+    # in Postgres schon weg; ab hier ist der Eintrag der einzige Beleg, dass es
+    # ihn je gab. Räumt `documents` nicht ab — etwa weil MongoDB gerade nicht
+    # antwortet —, wird trotzdem protokolliert und der Fehler danach
+    # weitergereicht. Andersherum wäre der Patient gelöscht und niemand wüsste,
+    # von wem.
+    try:
+        removed_documents = documents_service.delete_for_patient(patient_id)
+    except Exception:
+        _audit(
+            request,
+            EventType.PATIENT_DELETED,
+            None,
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            patient_id=patient_id,
+            # `null`, nicht `0`: Wie viele es waren, weiß hier niemand — und
+            # `0` hieße „der Patient hatte keine", was etwas anderes ist.
+            documents_removed=None,
+        )
+        raise
+
+    _audit(
+        request,
+        EventType.PATIENT_DELETED,
+        None,
+        status.HTTP_204_NO_CONTENT,
+        patient_id=patient_id,
+        documents_removed=removed_documents,
+    )
 
 
 def _audit(
@@ -191,13 +227,13 @@ def _audit(
     Nur die Kennung, nie Name, Geburtsdatum oder Versichertennummer — der Trail
     liegt dauerhaft in einer eigenen Datenbank, siehe `audit/events.py`.
     """
-    kennung = patient.id if patient is not None else patient_id
+    identifier = patient.id if patient is not None else patient_id
     audit.record(
         event,
         request=request,
         status=status_code,
         user_id=request.state.user_id,
-        target=f"patient:{kennung}",
+        target=f"patient:{identifier}",
         detail=detail,
     )
 
@@ -208,7 +244,7 @@ def _get_or_404(session: Session, patient_id: int) -> Patient:
     if patient is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Patient mit der ID {patient_id} wurde nicht gefunden",
+            detail=service.not_found_message(patient_id),
         )
     return patient
 

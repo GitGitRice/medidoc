@@ -1,5 +1,6 @@
 # Dependencies
-node_modules/
+# Ohne Schrägstrich: greift auch, wenn node_modules ein Symlink ist (siehe 020007d)
+node_modules
 .venv/
 venv/
 __pycache__/
@@ -23,3 +24,6 @@ build/
 # Logs
 *.log
 npm-debug.log*
+
+# Lokal hochgeladene Dokumente (im Container ein Docker-Volume)
+uploads/

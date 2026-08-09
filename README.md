@@ -6,8 +6,11 @@ Die Praxis verwaltet ihre Patienten und die zu ihnen gehörenden Dokumente an ei
 Patientenübersicht als durchsuchbare Tabelle, Stammdatenpflege und eine Akte pro Patient,
 in der Befunde, Arztbriefe und Laborwerte abgelegt werden.
 
-> **Status:** Konzeptphase. Fachliche Begriffe in [CONTEXT.md](./CONTEXT.md),
-> Entscheidungen in [docs/adr/](./docs/adr/), Planungsvorschlag für Sprint 1 in
+> **Status:** Sprint 1. Anmeldung und die Patienten-Endpunkte stehen, im Frontend stehen
+> Login, geschütztes Routing und die Patientenübersicht (Tabelle, Paginierung,
+> Navigation zur Detailseite) — die Detailseite selbst ist noch ein Platzhalter.
+> Fachliche Begriffe in [CONTEXT.md](./CONTEXT.md),
+> Entscheidungen in [docs/adr/](./docs/adr/), Sprint-1-Plan in
 > [docs/sprint-1-plan.md](./docs/sprint-1-plan.md).
 
 ## Team
@@ -21,7 +24,7 @@ in der Befunde, Arztbriefe und Laborwerte abgelegt werden.
 
 ## Tech-Stack
 
-- **Frontend:** React (Vite), React Router, Context API
+- **Frontend:** React (Vite), React Router, Context API, Material UI
 - **Backend:** FastAPI (Python)
 - **Datenbanken:** PostgreSQL für Patientenstammdaten, MongoDB für Dokumente
   — Begründung in [ADR-0002](./docs/adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)
@@ -72,7 +75,23 @@ Versionierung, Anbindung echter Praxissoftware. Begründungen im
 
 ## Lokal starten
 
-_Folgt, sobald das Setup steht._
+Falls noch keine `.env` existiert, einmalig die Beispielkonfiguration kopieren und
+anschließend den vollständigen Stack starten:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Danach sind das Frontend unter <http://localhost:5173>, die API unter
+<http://localhost:8000> und deren interaktive Dokumentation unter
+<http://localhost:8000/docs> erreichbar. Änderungen an Frontend und Backend werden
+von den Entwicklungsservern automatisch übernommen.
+
+PostgreSQL speichert die Patientenstammdaten im Volume `postgres_data`. MongoDB legt
+Dokument-Metadaten im Volume `mongo_data` ab; die eigentlichen Anhänge liegen getrennt
+im Volume `document_attachments`. `docker compose down` behält diese Daten, während
+`docker compose down -v` alle drei Volumes und deren Inhalte löscht.
 
 ## Projektstruktur
 
@@ -93,6 +112,7 @@ bevor sie fertig sind:
 
 - [docs/patients-api.md](./docs/patients-api.md) — Patientenübersicht, Stammdaten, CRUD
 - [docs/auth-api.md](./docs/auth-api.md) — Login, Token, Rollen
+- [docs/documents-api.md](./docs/documents-api.md) — Dokumente je Patient: anlegen, auflisten, löschen
 - [docs/logging-monitoring.md](./docs/logging-monitoring.md) — Log, Audit-Trail, Missbrauchserkennung
 
 ## Sprints
@@ -120,33 +140,17 @@ Test, Dokumentation, Abschlusspräsentation.
 
 ## Projekttagebuch
 
-Tägliche Einträge: Was wurde erledigt, woran wird gearbeitet, welche Hindernisse gibt es.
+Das Tagebuch steht in **[docs/Diary.md](./docs/Diary.md)** — ein Eintrag pro Person und
+Tag, neueste oben. Jeder ergänzt seinen eigenen vor Feierabend.
 
-### Woche 1
+Bewusst nur an einer Stelle: Zwei Tagebücher heißen, dass beide veralten.
 
-| Tag | Ergebnisse | Hindernisse |
-| --- | ---------- | ----------- |
-| Mo | | |
-| Di | | |
-| Mi | | |
-| Do | | |
-| Fr | | |
+### Sprint Review und Retrospektive
 
-**Sprint Review:** _tbd_
-**Retrospektive:** Was lief gut / Was hat gebremst / Was verbessern wir
-
-### Woche 2
-
-| Tag | Ergebnisse | Hindernisse |
-| --- | ---------- | ----------- |
-| Mo | | |
-| Di | | |
-| Mi | | |
-| Do | | |
-| Fr | | |
-
-**Sprint Review:** _tbd_
-**Retrospektive:** _tbd_
+| Woche | Review | Retrospektive |
+| ----- | ------ | ------------- |
+| 1 | _tbd_ | _tbd_ |
+| 2 | _tbd_ | _tbd_ |
 
 ## Entscheidungen
 

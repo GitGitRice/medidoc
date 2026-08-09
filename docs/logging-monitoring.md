@@ -60,6 +60,7 @@ Kein zweites Anwendungslog. Hier landet nur, was eine **Sicherheitsfrage** beant
 | `forbidden` | `403` — angemeldet, aber Rolle reicht nicht | warning |
 | `not_found` | `404` — einzeln harmlos, gehäuft eine Enumeration | warning |
 | `patient_created` / `patient_updated` / `patient_deleted` | schreibender Zugriff | info |
+| `document_created` / `document_deleted` | Dokument angelegt oder gelöscht — **ohne** Dateiname, Titel und `fields` | info |
 | `suspicious` | eine Regel hat angeschlagen | warning |
 
 **Lesende Zugriffe auf Patienten stehen nicht drin.** Die Übersicht wird den ganzen Tag
@@ -96,7 +97,7 @@ angefasst wurden, nicht womit sie gefüllt wurden:
   "user_id": 1,
   "ip": "172.18.0.1",
   "method": "PATCH",
-  "path": "/patienten/42",
+  "path": "/patients/42",
   "status": 200,
   "target": "patient:42",
   "detail": { "fields": ["city", "phone"] }
@@ -122,7 +123,7 @@ derselben Sekunde im Log wie das auslösende Ereignis.
 | `id_enumeration` | `not_found` | Benutzer | 20 |
 
 `id_enumeration` ist die Regel, die bei Patientendaten wirklich zählt: Jemand ruft
-`/patienten/1`, `/patienten/2`, `/patienten/3` … auf, um herauszufinden, welche Akten es
+`/patients/1`, `/patients/2`, `/patients/3` … auf, um herauszufinden, welche Akten es
 gibt. Ein einzelnes `404` ist nichts, zwanzig sind ein Muster.
 
 Die Warnung kommt **einmal je Überschreitung**, nicht bei jedem weiteren Versuch — sonst
