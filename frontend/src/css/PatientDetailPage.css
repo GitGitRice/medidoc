@@ -409,3 +409,66 @@
   color: #888;
   margin: 0;
 }
+
+.search-box {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 16px 0 42px;
+
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
+
+  background-color: #ffffff;
+  color: #1e293b;
+
+  font-size: 14px;
+  outline: none;
+
+  box-sizing: border-box;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.search-input::placeholder {
+  color: #94a3b8;
+}
+
+.search-input:hover {
+  border-color: #b8c2cf;
+}
+
+.search-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.document-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.document-actions-right {
+  display: flex;
+  gap: 8px;
+}

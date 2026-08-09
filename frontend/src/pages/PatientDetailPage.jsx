@@ -1,7 +1,7 @@
 import DocumentList from '../components/DocumentList';
 import PatientDetail from '../components/PatientDetail';
 
-import '../PatientDetailPage.css';
+import '../css/PatientDetailPage.css';
 
 import { useEffect, useState } from 'react';
 
@@ -62,9 +62,6 @@ export function PatientDetailPage() {
     }
   }
 
-  // HANDFLER
-
-  // DELETE DOCUMENT
   async function handleDeleteDocument(id) {
     try {
       // API-Call: DELETE
@@ -76,7 +73,6 @@ export function PatientDetailPage() {
     }
   }
 
-  // UPDATE Document
   async function handleUpdateDocument(id, patientId, changeDocument) {
 
     const currentDocument = documents.find(document => document.id === id);
@@ -129,19 +125,7 @@ export function PatientDetailPage() {
                   false : document.tags.toLowerCase().includes(searchTextLowerCase);
           textMatch = titleMatchBySearchText || tagMatchBySearchText;
     }
-/*
-    let tagMatch = true;
 
-    if (searchTagDocuments.length > 0 ) {
-      if (document.tags == null ) {
-        tagMatch = false;
-      }
-
-      tagMatch = document.tags.filter(tag => 
-        tag.includes(searchTagDocuments)).length > 0;
-           
-    }
-        */
       return textMatch;
     })
   return ( 
@@ -181,14 +165,16 @@ export function PatientDetailPage() {
                 </button>
               </div>
             )}  
-            <div className="item-form">
-              <input
-                type="text"
-                placeholder="Suche in Title, Tags"
-                className="form-input"
-                value={searchTextDocuments}
-                onChange = {(e) => setSearchTextDocuments(e.target.value)}
-              />
+            <div className="search-box">
+                <span className="search-icon">⌕</span>
+
+                <input
+                  type="text"
+                  placeholder="Suche in Titel, Tags"
+                  className="search-input"
+                  value={searchTextDocuments}
+                  onChange={(e) => setSearchTextDocuments(e.target.value)}
+                />
             </div>
             {/* NEU: Loading-Anzeige waehrend die Dokumente geladen werden */}           
             {loading ? (

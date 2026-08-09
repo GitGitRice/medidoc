@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import DeleteConfirmDialog from "./dialogs/DeleteConfirmDialog";
+
 function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit, onUpdateDocument }) {
     // Lokaler State für Edit-Formular
   const [editTitle, setEditTitle] = useState(document.title || '');
   const [editDescription, setEditDescription] = useState(document.description || '');
   const [editTags, setEditTags] = useState(document.tags || '');
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Wenn Item sich ändert, Formular-Werte aktualisieren
   useEffect(() => {
@@ -13,6 +17,22 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
     setEditDescription(document.description || '');
     setEditTags(document.tags || []);
   }, [document]);
+
+  //Dialog Handler
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false);
+  };
+
+  const handleConfirmDelete = () => {
+    onDelete(document.id);
+
+    setDeleteDialogOpen(false);
+  };
+
 
   // Save Handler
   function handleSave() {
@@ -110,17 +130,37 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
 
       <div className="item-card-footer">
         
-        <div style={{ display: 'flex', gap: '8px',  justifyContent: 'flex-end', width: '100%' }}>
-          <button
+        <div className="document-actions">
+           <button
             className="edit-btn edit-btn--cancel"
-            onClick={() => onStartEdit(document.id)}
-          >
-            Bearbeiten
+           >
+            Anhang laden
           </button>
-          <button className="delete-btn" onClick={() => onDelete(document.id)}>
-            Löschen
-          </button>
+          <div className="document-actions-right">
+            <button
+              className="edit-btn edit-btn--cancel"
+              onClick={() => onStartEdit(document.id)}
+            >
+              Bearbeiten
+            </button>
+          
+            <button  
+              className="delete-btn" 
+              onClick={() => handleDeleteClick()}
+            >
+              Löschen
+            </button>
+          </div>
         </div>
+
+        <DeleteConfirmDialog
+          open={deleteDialogOpen}
+          title="Dokument löschen?"
+          message={`Möchtest du "${document.title}" wirklich löschen?`}
+          onCancel={handleCancelDelete}
+          onConfirm={handleConfirmDelete}
+        />
+
       </div>
     </article>
   );
