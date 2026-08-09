@@ -118,10 +118,8 @@ export function getCurrentUser(token, options = {}) {
   return apiRequest("/auth/me", { ...options, token });
 }
 
-/**
- * Der Pfad für `GET /patients`, mit Seitengröße.
- */
-export function patientsPath({ limit, offset } = {}) {
+/** Hängt `limit` und `offset` an einen Pfad, soweit gesetzt. */
+function withPaging(path, { limit, offset } = {}) {
   const params = new URLSearchParams();
   if (limit != null) {
     params.set("limit", limit);
@@ -131,5 +129,42 @@ export function patientsPath({ limit, offset } = {}) {
   }
 
   const query = params.toString();
-  return query ? `/patients?${query}` : "/patients";
+  return query ? `${path}?${query}` : path;
+}
+
+/**
+ * Der Pfad für `GET /patients`, mit Seitengröße.
+ */
+export function patientsPath({ limit, offset } = {}) {
+  return withPaging("/patients", { limit, offset });
+}
+
+/**
+ * Der Pfad für `GET /users` und `POST /users` — nur für `admin`.
+ *
+ * Die Liste enthält auch deaktivierte Benutzer; erkennbar sind sie an
+ * `is_active`.
+ */
+export function usersPath({ limit, offset } = {}) {
+  return withPaging("/users", { limit, offset });
+}
+
+/** Der Pfad für `PATCH /users/{id}`. */
+export function userPath(userId) {
+  return `/users/${userId}`;
+}
+
+/**
+ * Die Options für einen Request mit JSON-Rumpf.
+ *
+ * Steht hier und nicht in den Seiten, damit `Content-Type` und
+ * `JSON.stringify` nicht an jeder Aufrufstelle neu zusammengesetzt werden —
+ * ein vergessener Header wäre ein `422`, das nach einem Datenfehler aussieht.
+ */
+export function jsonBody(method, data) {
+  return {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  };
 }

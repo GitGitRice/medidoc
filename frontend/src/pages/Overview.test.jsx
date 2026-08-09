@@ -234,6 +234,10 @@ describe("Overview", () => {
     ).toBeInTheDocument();
   });
 
+  // Der Weg in die Benutzerverwaltung wird nicht mehr hier geprueft: Er steht
+  // seit der Ueberarbeitung der Kopfzeile in der Navigation und damit in
+  // `Layout.jsx` — geprueft wird er in `Layout.test.jsx`.
+
   it("zeigt den Details-Button auch für staff", async () => {
     apiRequest.mockResolvedValue({ items: [patient], total: 1, limit: 25, offset: 0 });
 

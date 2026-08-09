@@ -72,7 +72,9 @@ export function LoginPage() {
       <h1>MediDoc</h1>
       <h2>Anmelden</h2>
 
-      <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
+      {/* `plain-form` holt die Formularregeln aus `styles.css` — sie gelten
+          nur noch hier und nicht mehr in jedem MUI-Dialog der Anwendung. */}
+      <form className="plain-form" onSubmit={handleSubmit} aria-busy={isSubmitting}>
         <label>
           E-Mail
           <input
