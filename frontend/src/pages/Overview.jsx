@@ -17,7 +17,7 @@ export function Overview() {
   const [patients, setPatients] = useState(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [q, setQ] = useState("");
   const [error, setError] = useState(null);
 

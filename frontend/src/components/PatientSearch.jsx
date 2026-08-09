@@ -30,7 +30,9 @@ export function PatientSearch({ onSearch }) {
       onChange={(event) => setInputValue(event.target.value)}
       label="Suche nach Name oder Vorname"
       size="small"
-      fullWidth
+      // Auf schmalen Fenstern volle Breite, ab `sm` eine feste, kompakte
+      // Breite — ein Suchfeld muss nicht so breit wie die Tabelle sein.
+      sx={{ width: { xs: "100%", sm: 320 } }}
       slotProps={{
         input: {
           startAdornment: (

@@ -190,7 +190,7 @@ describe("Overview", () => {
 
   it("laedt bei Klick auf die naechste Seite mit passendem offset nach", async () => {
     apiRequest.mockResolvedValue({
-      items: Array.from({ length: 25 }, (_, i) => ({
+      items: Array.from({ length: 10 }, (_, i) => ({
         id: i + 1,
         first_name: `Vorname${i}`,
         last_name: `Nachname${i}`,
@@ -198,7 +198,7 @@ describe("Overview", () => {
         insurance_number: null,
       })),
       total: 30,
-      limit: 25,
+      limit: 10,
       offset: 0,
     });
 
@@ -206,7 +206,7 @@ describe("Overview", () => {
 
     await screen.findByRole("cell", { name: "Nachname0" });
     expect(apiRequest).toHaveBeenLastCalledWith(
-      "/patients?limit=25&offset=0",
+      "/patients?limit=10&offset=0",
       expect.objectContaining({ token: "stored-token" }),
     );
 
@@ -214,7 +214,7 @@ describe("Overview", () => {
 
     await waitFor(() => {
       expect(apiRequest).toHaveBeenLastCalledWith(
-        "/patients?limit=25&offset=25",
+        "/patients?limit=10&offset=10",
         expect.objectContaining({ token: "stored-token" }),
       );
     });
@@ -250,7 +250,7 @@ describe("Overview", () => {
 
   it("beschriftet die Seitensteuerung auf Deutsch", async () => {
     apiRequest.mockResolvedValue({
-      items: Array.from({ length: 25 }, (_, i) => ({
+      items: Array.from({ length: 10 }, (_, i) => ({
         id: i + 1,
         first_name: `Vorname${i}`,
         last_name: `Nachname${i}`,
@@ -258,7 +258,7 @@ describe("Overview", () => {
         insurance_number: null,
       })),
       total: 30,
-      limit: 25,
+      limit: 10,
       offset: 0,
     });
 
@@ -267,11 +267,36 @@ describe("Overview", () => {
     await screen.findByRole("cell", { name: "Nachname0" });
 
     expect(screen.getByText("Zeilen pro Seite:")).toBeInTheDocument();
-    expect(screen.getByText("1–25 von 30")).toBeInTheDocument();
+    expect(screen.getByText("1–10 von 30")).toBeInTheDocument();
     expect(screen.getByLabelText("Erste Seite")).toBeInTheDocument();
     expect(screen.getByLabelText("Vorherige Seite")).toBeInTheDocument();
     expect(screen.getByLabelText("Nächste Seite")).toBeInTheDocument();
     expect(screen.getByLabelText("Letzte Seite")).toBeInTheDocument();
+  });
+
+  it("laedt standardmaeßig 10 Patienten pro Seite", async () => {
+    apiRequest.mockResolvedValue({
+      items: Array.from({ length: 10 }, (_, i) => ({
+        id: i + 1,
+        first_name: `Vorname${i}`,
+        last_name: `Nachname${i}`,
+        date_of_birth: "1990-01-01",
+        insurance_number: null,
+      })),
+      total: 12,
+      limit: 10,
+      offset: 0,
+    });
+
+    renderOverview();
+
+    await screen.findByRole("cell", { name: "Nachname0" });
+
+    expect(apiRequest).toHaveBeenLastCalledWith(
+      "/patients?limit=10&offset=0",
+      expect.objectContaining({ token: "stored-token" }),
+    );
+    expect(screen.getByText("1–10 von 12")).toBeInTheDocument();
   });
 
   it("übernimmt fehlende Versichertennummer nicht als leere Zelle", async () => {
@@ -351,14 +376,14 @@ describe("Overview", () => {
       });
 
       expect(apiRequest).toHaveBeenLastCalledWith(
-        "/patients?q=hartmann&limit=25&offset=0",
+        "/patients?q=hartmann&limit=10&offset=0",
         expect.objectContaining({ token: "stored-token" }),
       );
     });
 
     it("setzt die Seite auf 0 zurück, wenn sich die Suche ändert", async () => {
       apiRequest.mockResolvedValue({
-        items: Array.from({ length: 25 }, (_, i) => ({
+        items: Array.from({ length: 10 }, (_, i) => ({
           id: i + 1,
           first_name: `Vorname${i}`,
           last_name: `Nachname${i}`,
@@ -366,7 +391,7 @@ describe("Overview", () => {
           insurance_number: null,
         })),
         total: 30,
-        limit: 25,
+        limit: 10,
         offset: 0,
       });
 
@@ -376,7 +401,7 @@ describe("Overview", () => {
       fireEvent.click(screen.getByLabelText("Nächste Seite"));
       await waitFor(() => {
         expect(apiRequest).toHaveBeenLastCalledWith(
-          "/patients?limit=25&offset=25",
+          "/patients?limit=10&offset=10",
           expect.objectContaining({ token: "stored-token" }),
         );
       });
@@ -389,7 +414,7 @@ describe("Overview", () => {
       });
 
       expect(apiRequest).toHaveBeenLastCalledWith(
-        "/patients?q=hartmann&limit=25&offset=0",
+        "/patients?q=hartmann&limit=10&offset=0",
         expect.objectContaining({ token: "stored-token" }),
       );
     });
@@ -446,7 +471,7 @@ describe("Overview", () => {
       });
 
       expect(apiRequest).toHaveBeenLastCalledWith(
-        "/patients?limit=25&offset=0",
+        "/patients?limit=10&offset=0",
         expect.objectContaining({ token: "stored-token" }),
       );
       expect(screen.getByRole("cell", { name: "Mustermann" })).toBeInTheDocument();
