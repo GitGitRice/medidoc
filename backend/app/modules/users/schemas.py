@@ -69,6 +69,20 @@ class UserAdminView(UserPublic):
     is_active: bool
 
 
+class UserPage(SQLModel):
+    """Ein Ausschnitt der Benutzerliste plus die Gesamtzahl.
+
+    Dieselbe Form wie `PatientPage` — das Frontend paginiert damit auf beiden
+    Seiten mit demselben Code. `total` ist die Gesamtzahl **ohne**
+    `limit`/`offset`, daraus bildet die Tabelle ihre Seitenzahl.
+    """
+
+    items: list[UserAdminView]
+    total: int
+    limit: int
+    offset: int
+
+
 class UserUpdate(SQLModel):
     """Was ein `admin` an einem bestehenden Benutzer ändern darf.
 

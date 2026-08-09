@@ -9,6 +9,78 @@ rot wird.
 from fastapi.testclient import TestClient
 
 
+def test_admin_sieht_die_benutzerliste(client: TestClient, admin_headers, make_user):
+    make_user(email="tom.staff@medidoc.test", name="Tom Staff", role="staff")
+
+    response = client.get("/users", headers=admin_headers)
+
+    assert response.status_code == 200
+    seite = response.json()
+    assert seite["total"] == 2
+    assert {eintrag["email"] for eintrag in seite["items"]} == {
+        "anna.admin@medidoc.test",
+        "tom.staff@medidoc.test",
+    }
+
+
+def test_liste_zeigt_auch_deaktivierte_benutzer(
+    client: TestClient, admin_headers, make_user
+):
+    """Ohne sie wäre das Deaktivieren nicht umkehrbar — der Benutzer wäre weg."""
+    make_user(email="tom.staff@medidoc.test", name="Tom Staff", is_active=False)
+
+    items = client.get("/users", headers=admin_headers).json()["items"]
+
+    tom = next(e for e in items if e["email"] == "tom.staff@medidoc.test")
+    assert tom["is_active"] is False
+
+
+def test_liste_gibt_keine_passwoerter_heraus(
+    client: TestClient, admin_headers, make_user
+):
+    make_user(email="tom.staff@medidoc.test", name="Tom Staff")
+
+    items = client.get("/users", headers=admin_headers).json()["items"]
+
+    assert all("password_hash" not in eintrag for eintrag in items)
+
+
+def test_liste_ist_nach_namen_sortiert(client: TestClient, admin_headers, make_user):
+    make_user(email="zoe@medidoc.test", name="Zoe Zuletzt")
+    make_user(email="bea@medidoc.test", name="Bea Zweite")
+
+    items = client.get("/users", headers=admin_headers).json()["items"]
+
+    assert [eintrag["name"] for eintrag in items] == [
+        "Anna Admin",
+        "Bea Zweite",
+        "Zoe Zuletzt",
+    ]
+
+
+def test_liste_ist_seitenweise_abrufbar(client: TestClient, admin_headers, make_user):
+    """`total` zählt alle, `items` nur den angeforderten Ausschnitt."""
+    make_user(email="bea@medidoc.test", name="Bea Zweite")
+    make_user(email="zoe@medidoc.test", name="Zoe Zuletzt")
+
+    seite = client.get("/users?limit=1&offset=1", headers=admin_headers).json()
+
+    assert seite["total"] == 3
+    assert [eintrag["name"] for eintrag in seite["items"]] == ["Bea Zweite"]
+
+
+def test_staff_darf_die_benutzerliste_nicht_lesen(client: TestClient, staff_headers):
+    response = client.get("/users", headers=staff_headers)
+
+    assert response.status_code == 403
+
+
+def test_liste_ohne_anmeldung_liefert_401(client: TestClient):
+    response = client.get("/users")
+
+    assert response.status_code == 401
+
+
 def test_admin_legt_benutzer_an(client: TestClient, admin_headers):
     response = client.post(
         "/users",

@@ -1,6 +1,6 @@
 """Benutzerverwaltung — Endpunkte.
 
-Anlegen, Deaktivieren und Rolle ändern. Alles hier verlangt `admin`
+Auflisten, Anlegen, Deaktivieren und Rolle ändern. Alles hier verlangt `admin`
 (ADR-0005); die Prüfung hängt am Router und nicht an den einzelnen Funktionen,
 damit ein neuer Endpunkt nicht versehentlich ungeschützt bleibt — dieselbe
 Begründung wie in `patients/router.py`.
@@ -14,7 +14,7 @@ Pfad und JSON-Keys sind englisch, deutsch sind nur Kommentare und Doku.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session
 
 from app.core.errors import ErrorResponse
@@ -25,6 +25,7 @@ from app.modules.users.models import Role, User
 from app.modules.users.schemas import (
     UserAdminView,
     UserCreate,
+    UserPage,
     UserUpdate,
 )
 
@@ -47,6 +48,26 @@ NOT_FOUND = {"model": ErrorResponse, "description": "Benutzer nicht gefunden"}
 CONFLICT = {"model": ErrorResponse, "description": "E-Mail bereits vergeben"}
 SELF_LOCKOUT = {"model": ErrorResponse, "description": "Sperre des eigenen Kontos"}
 UNPROCESSABLE = {"model": ErrorResponse, "description": "Eingabe ungültig"}
+
+
+@router.get(
+    "",
+    response_model=UserPage,
+    summary="Benutzerübersicht",
+    responses={401: UNAUTHORIZED, 403: FORBIDDEN, 422: UNPROCESSABLE},
+)
+def list_users(
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=service.MAX_LIMIT)] = 25,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> UserPage:
+    """Alle Benutzer, nach Namen sortiert und seitenweise.
+
+    Deaktivierte sind enthalten und über `is_active` erkennbar — die Verwaltung
+    muss sie zeigen können, sonst wäre ein Deaktivieren nicht umkehrbar.
+    """
+    items, total = service.list_all(session, limit=limit, offset=offset)
+    return UserPage(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.post(
