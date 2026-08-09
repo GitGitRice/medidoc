@@ -44,6 +44,10 @@ export function PatientDetailPage() {
       setLoading(true);
       setError(null);
       const patientData = await getPatient(patientId);
+
+      if (!patientData || !patientData.id) {
+        throw new Error("Patient nicht gefunden");
+      }
       
       console.log("Loading Patient: ", patientData)
       
@@ -128,20 +132,12 @@ export function PatientDetailPage() {
 
       return textMatch;
     })
-  return ( 
-        <div className="app-main">
-             <aside className="app-sidebar">
-              {loading ? (
-                <p style={{ textAlign: "center", color: "#888", padding: "40px" }}>
-                  Lade Patient...
-                </p>
-              ) : (
-                <PatientDetail patient = {patient} />
-              )}
-              </aside>
-            <section className="app-content">
-              {error && (
+    if (error) 
+      return (  
+      <div className="app-main">
+           {error && (
               <div style={{
+                gridColumn : "1 / -1",
                 padding: "12px 16px",
                 marginBottom: "16px",
                 backgroundColor: "#fee",
@@ -165,6 +161,21 @@ export function PatientDetailPage() {
                 </button>
               </div>
             )}  
+      </div> )
+  return ( 
+       
+            <div className="app-main">
+             <aside className="app-sidebar">
+              {loading ? (
+                <p style={{ textAlign: "center", color: "#888", padding: "40px" }}>
+                  Lade Patient...
+                </p>
+              ) : (
+                <PatientDetail patient = {patient} />
+              )}
+              </aside>
+            <section className="app-content">
+             
             <div className="search-box">
                 <span className="search-icon">⌕</span>
 
