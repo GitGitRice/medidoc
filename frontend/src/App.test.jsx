@@ -22,6 +22,13 @@ const user = {
   role: "admin",
 };
 
+const staffUser = {
+  id: 2,
+  email: "tom.staff@medidoc.test",
+  name: "Tom Staff",
+  role: "staff",
+};
+
 function renderAt(path) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -144,5 +151,39 @@ describe("Authentifizierung", () => {
       ).toBeInTheDocument();
     });
     expect(window.localStorage.getItem("medidoc.accessToken")).toBeNull();
+  });
+});
+
+describe("Benutzerverwaltung", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("öffnet /users für einen admin", async () => {
+    window.localStorage.setItem("medidoc.accessToken", "stored-token");
+    getCurrentUser.mockResolvedValue(user);
+
+    renderAt("/users");
+
+    expect(
+      await screen.findByRole("heading", { name: "Benutzerverwaltung" }),
+    ).toBeInTheDocument();
+  });
+
+  it("zeigt einem staff-Benutzer dort die Meldung zur Berechtigung", async () => {
+    window.localStorage.setItem("medidoc.accessToken", "stored-token");
+    getCurrentUser.mockResolvedValue(staffUser);
+
+    renderAt("/users");
+
+    expect(await screen.findByText("Dazu fehlt dir die Berechtigung")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Benutzerverwaltung" }),
+    ).not.toBeInTheDocument();
+    // Kein Rauswurf zur Anmeldung: Wer angemeldet ist, ist nicht falsch
+    // angemeldet, nur nicht berechtigt (401 gegen 403, docs/auth-api.md).
+    expect(
+      screen.queryByRole("heading", { name: "Anmelden" }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -5,9 +5,9 @@ import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
-import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
 
+import { PaginationFooter } from "./PaginationFooter.jsx";
 import { PatientActions } from "./PatientActions.jsx";
 
 /**
@@ -18,21 +18,6 @@ import { PatientActions } from "./PatientActions.jsx";
 function formatDate(isoDate) {
   const [year, month, day] = isoDate.split("-");
   return `${day}.${month}.${year}`;
-}
-
-function paginationItemLabel(type) {
-  switch (type) {
-    case "first":
-      return "Erste Seite";
-    case "last":
-      return "Letzte Seite";
-    case "next":
-      return "Nächste Seite";
-    case "previous":
-      return "Vorherige Seite";
-    default:
-      return "";
-  }
 }
 
 /**
@@ -92,18 +77,12 @@ export function PatientTable({
           </TableBody>
         </Table>
       </TableContainer>
-      <TablePagination
-        component="div"
-        count={total}
+      <PaginationFooter
+        total={total}
         page={page}
-        onPageChange={onPageChange}
         rowsPerPage={rowsPerPage}
+        onPageChange={onPageChange}
         onRowsPerPageChange={onRowsPerPageChange}
-        showFirstButton
-        showLastButton
-        labelRowsPerPage="Zeilen pro Seite:"
-        labelDisplayedRows={({ from, to, count }) => `${from}–${to} von ${count}`}
-        getItemAriaLabel={paginationItemLabel}
       />
     </Paper>
   );

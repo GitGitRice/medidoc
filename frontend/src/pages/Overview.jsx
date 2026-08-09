@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
 
 import { patientsPath } from "../api.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { PatientTable } from "../components/PatientTable.jsx";
 
 export function Overview() {
-  const { apiFetch } = useAuth();
+  const { apiFetch, hasRole } = useAuth();
 
   const [patients, setPatients] = useState(null);
   const [total, setTotal] = useState(0);
@@ -71,6 +74,21 @@ export function Overview() {
         </Box>
         {/* "Neuer Patient" bewusst nicht gerendert: weder eine Route
             (/patients/new) noch ein api.js-Aufruf dafuer existieren. */}
+
+        {/* Der Weg zur Benutzerverwaltung (#54). Nur fuer `admin` sichtbar —
+            wer sie nicht bedienen darf, soll nicht erst dagegenlaufen. Das
+            Ausblenden ist Bedienkomfort: Durchgesetzt wird die Rolle von
+            `RoleRoute` und vom Backend. */}
+        {hasRole("admin") && (
+          <Button
+            component={RouterLink}
+            to="/users"
+            variant="outlined"
+            startIcon={<ManageAccountsOutlinedIcon />}
+          >
+            Benutzerverwaltung
+          </Button>
+        )}
       </Stack>
 
       {error && <Alert severity="error">{error.message}</Alert>}
