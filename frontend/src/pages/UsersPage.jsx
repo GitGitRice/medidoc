@@ -8,14 +8,13 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
 import PersonAddAlt1OutlinedIcon from "@mui/icons-material/PersonAddAlt1Outlined";
 
 import { jsonBody, userPath, usersPath } from "../api.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { roleLabel } from "../auth/roles.js";
 import { CreateUserDialog } from "../components/CreateUserDialog.jsx";
+import { PageHeader } from "../components/PageHeader.jsx";
 import { UserTable } from "../components/UserTable.jsx";
 
 /**
@@ -145,34 +144,22 @@ export function UsersPage() {
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        alignItems="baseline"
-        justifyContent="space-between"
-        sx={{ marginBlockEnd: 2 }}
-      >
-        <Box>
-          {/* Layout.jsx traegt bereits <h1>MediDoc</h1> — diese Ueberschrift
-              bleibt deshalb h2, keine zweite h1 auf derselben Seite. */}
-          <Typography variant="h4" component="h2">
-            Benutzerverwaltung
-          </Typography>
-          {/* "Benutzer" ist im Plural dasselbe Wort — anders als bei den
-              Patienten braucht es hier keine Fallunterscheidung. */}
-          {!error && users !== null && (
-            <Typography variant="body2" color="text.secondary">
-              {total} Benutzer
-            </Typography>
-          )}
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<PersonAddAlt1OutlinedIcon />}
-          onClick={() => setIsCreateOpen(true)}
-        >
-          Benutzer anlegen
-        </Button>
-      </Stack>
+      {/* "Benutzer" ist im Plural dasselbe Wort — anders als bei den
+          Patienten braucht es hier keine Fallunterscheidung. */}
+      <PageHeader
+        title="Benutzerverwaltung"
+        count={!error && users !== null ? `${total} Benutzer` : null}
+        action={
+          <Button
+            variant="contained"
+            disableElevation
+            startIcon={<PersonAddAlt1OutlinedIcon />}
+            onClick={() => setIsCreateOpen(true)}
+          >
+            Benutzer anlegen
+          </Button>
+        }
+      />
 
       {error && <Alert severity="error">{error.message}</Alert>}
 

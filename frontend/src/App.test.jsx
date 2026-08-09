@@ -73,7 +73,7 @@ describe("Authentifizierung", () => {
     await fillLoginForm();
 
     expect(
-      await screen.findByRole("heading", { name: "Angemeldet" }),
+      await screen.findByRole("heading", { name: "Patientenübersicht" }),
     ).toBeInTheDocument();
     expect(requestLogin).toHaveBeenCalledWith(user.email, "geheim123");
     expect(window.localStorage.getItem("medidoc.accessToken")).toBe(
@@ -100,7 +100,7 @@ describe("Authentifizierung", () => {
     renderAt("/");
 
     expect(
-      await screen.findByRole("heading", { name: "Angemeldet" }),
+      await screen.findByRole("heading", { name: "Patientenübersicht" }),
     ).toBeInTheDocument();
     expect(getCurrentUser).toHaveBeenCalledWith(
       "stored-token",
@@ -134,7 +134,7 @@ describe("Authentifizierung", () => {
     fireEvent.click(screen.getByRole("button", { name: "Erneut versuchen" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Angemeldet" }),
+      await screen.findByRole("heading", { name: "Patientenübersicht" }),
     ).toBeInTheDocument();
   });
 

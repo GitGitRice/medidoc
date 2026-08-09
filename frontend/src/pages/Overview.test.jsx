@@ -47,7 +47,6 @@ function renderOverview(currentUser = adminUser) {
         <Routes>
           <Route index element={<Overview />} />
           <Route path="/patients/:patientId" element={<p>Patientendetails-Platzhalter</p>} />
-          <Route path="/users" element={<p>Benutzerverwaltung-Platzhalter</p>} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -235,30 +234,9 @@ describe("Overview", () => {
     ).toBeInTheDocument();
   });
 
-  it("führt einen admin von hier in die Benutzerverwaltung", async () => {
-    apiRequest.mockResolvedValue({ items: [patient], total: 1, limit: 25, offset: 0 });
-
-    renderOverview();
-
-    fireEvent.click(
-      await screen.findByRole("link", { name: "Benutzerverwaltung" }),
-    );
-
-    expect(
-      await screen.findByText("Benutzerverwaltung-Platzhalter"),
-    ).toBeInTheDocument();
-  });
-
-  it("zeigt staff den Weg in die Benutzerverwaltung gar nicht erst", async () => {
-    apiRequest.mockResolvedValue({ items: [patient], total: 1, limit: 25, offset: 0 });
-
-    renderOverview(staffUser);
-
-    await screen.findByRole("cell", { name: "Mustermann" });
-    expect(
-      screen.queryByRole("link", { name: "Benutzerverwaltung" }),
-    ).not.toBeInTheDocument();
-  });
+  // Der Weg in die Benutzerverwaltung wird nicht mehr hier geprueft: Er steht
+  // seit der Ueberarbeitung der Kopfzeile in der Navigation und damit in
+  // `Layout.jsx` — geprueft wird er in `Layout.test.jsx`.
 
   it("zeigt den Details-Button auch für staff", async () => {
     apiRequest.mockResolvedValue({ items: [patient], total: 1, limit: 25, offset: 0 });

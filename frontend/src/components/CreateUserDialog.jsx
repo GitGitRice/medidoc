@@ -7,9 +7,6 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
-import FormControl from "@mui/material/FormControl";
-import InputLabel from "@mui/material/InputLabel";
-import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 
@@ -49,16 +46,20 @@ export function CreateUserDialog({ open, onClose, onCreate }) {
   }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    // `xs` statt `sm`: Vier einspaltige Felder in 600px Breite lassen den
+    // Dialog leer wirken. 444px sind so breit, wie das Formular lang ist.
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <Box component="form" onSubmit={handleSubmit} aria-busy={isSubmitting}>
-        <DialogTitle>Benutzer anlegen</DialogTitle>
+        <DialogTitle sx={{ paddingBlockEnd: 1 }}>Benutzer anlegen</DialogTitle>
         <DialogContent>
-          <DialogContentText sx={{ marginBlockEnd: 2 }}>
+          <DialogContentText variant="body2" sx={{ marginBlockEnd: 3 }}>
             Der neue Benutzer kann sich sofort mit dieser E-Mail und diesem
             Passwort anmelden.
           </DialogContentText>
 
-          <Stack spacing={2}>
+          {/* `paddingBlockStart`: `DialogContent` schneidet oben ab, und die
+              hochgestellte Beschriftung des ersten Feldes sitzt genau dort. */}
+          <Stack spacing={2.5} sx={{ paddingBlockStart: 0.5 }}>
             {error && <Alert severity="error">{error.message}</Alert>}
 
             <TextField
@@ -89,29 +90,41 @@ export function CreateUserDialog({ open, onClose, onCreate }) {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
-            <FormControl fullWidth>
-              <InputLabel htmlFor="new-user-role">Rolle</InputLabel>
-              <Select
-                native
-                label="Rolle"
-                value={role}
-                onChange={(event) => setRole(event.target.value)}
-                inputProps={{ id: "new-user-role" }}
-              >
-                {ROLES.map((value) => (
-                  <option key={value} value={value}>
-                    {roleLabel(value)}
-                  </option>
-                ))}
-              </Select>
-            </FormControl>
+            {/* Als `TextField` wie die drei Felder darueber, statt als
+                `FormControl` + `InputLabel` + `Select` von Hand
+                zusammengesetzt: Sonst sitzt die Beschriftung "Rolle" anders
+                als "Name", "E-Mail" und "Passwort" — sichtbar im Dialog, in
+                dem sie als einzige schon oben klebte, bevor etwas eingegeben
+                war. `native` bleibt: Die Rolle ist eine Auswahl aus zwei
+                Werten, dafuer genuegt das Feld des Browsers, das mit Tastatur
+                und Vorlesesoftware ohne Zutun bedienbar ist. */}
+            <TextField
+              select
+              slotProps={{ select: { native: true } }}
+              label="Rolle"
+              fullWidth
+              value={role}
+              onChange={(event) => setRole(event.target.value)}
+              helperText="Administratoren dürfen zusätzlich Benutzer verwalten."
+            >
+              {ROLES.map((value) => (
+                <option key={value} value={value}>
+                  {roleLabel(value)}
+                </option>
+              ))}
+            </TextField>
           </Stack>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ paddingInline: 3, paddingBlockEnd: 2.5 }}>
           <Button type="button" onClick={onClose} disabled={isSubmitting}>
             Abbrechen
           </Button>
-          <Button type="submit" variant="contained" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            variant="contained"
+            disableElevation
+            disabled={isSubmitting}
+          >
             {isSubmitting ? "Wird angelegt …" : "Anlegen"}
           </Button>
         </DialogActions>

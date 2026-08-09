@@ -32,8 +32,10 @@ export function UserActions({ user, isSelf, isBusy, selfHint, onDeactivate, onAc
         icon: <UndoOutlinedIcon fontSize="small" />,
       };
 
+  // `justifyContent` gehoert in `sx`: Als eigene Prop nimmt `Stack` es in
+  // dieser MUI-Fassung nicht mehr an und reicht es wirkungslos durch.
   return (
-    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+    <Stack direction="row" spacing={0.5} sx={{ justifyContent: "flex-end" }}>
       <Tooltip title={action.tooltip}>
         {/* Eine deaktivierte Schaltfläche löst keine Ereignisse aus — ohne das
             umschließende Element bliebe der Tooltip genau dort stumm, wo er die

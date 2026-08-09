@@ -48,7 +48,10 @@ export function UserTable({
   return (
     <Paper variant="outlined">
       <TableContainer>
-        <Table size="medium">
+        {/* `minWidth`, damit `TableContainer` auf schmalen Fenstern schiebt
+            statt zu quetschen: Ohne die Angabe schrumpfte die Rollenauswahl
+            auf ihren Pfeil zusammen und war nicht mehr lesbar. */}
+        <Table size="medium" sx={{ minWidth: 720 }}>
           <TableHead>
             <TableRow sx={{ backgroundColor: "action.hover" }}>
               <TableCell sx={{ fontWeight: 500 }}>Name</TableCell>

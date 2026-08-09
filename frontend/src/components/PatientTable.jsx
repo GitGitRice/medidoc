@@ -42,7 +42,9 @@ export function PatientTable({
   return (
     <Paper variant="outlined">
       <TableContainer>
-        <Table size="medium">
+        {/* Wie in `UserTable`: schieben statt quetschen, sobald das Fenster
+            schmaler wird als die Tabelle breit ist. */}
+        <Table size="medium" sx={{ minWidth: 720 }}>
           <TableHead>
             <TableRow sx={{ backgroundColor: "action.hover" }}>
               <TableCell sx={{ fontWeight: 500 }}>Nachname</TableCell>
