@@ -17,6 +17,7 @@ Basis-URL lokal: `http://localhost:8000`
 - Der **Patient** ist die zentrale Einheit. Stammdaten liegen in PostgreSQL, Dokumente ab
   Sprint 2 in MongoDB ([ADR-0002](./adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md)).
 - **Jeder Endpunkt verlangt einen gültigen Token.** `DELETE` verlangt zusätzlich `admin`.
+- **`DELETE` nimmt die ganze Akte mit** — alle Dokumente und Anhänge des Patienten.
 - Pflicht sind nur `first_name`, `last_name`, `date_of_birth`. Alles andere darf fehlen.
 - `GET /patients` liefert **keine nackte Liste**, sondern `{ items, total, limit, offset }`.
 - Jede Fehlerantwort hat dieselbe Form: `status` und `message`.
@@ -27,7 +28,7 @@ Basis-URL lokal: `http://localhost:8000`
 | `POST` | `/patients` | Patient anlegen | `201` | Token |
 | `GET` | `/patients/{id}` | Stammdaten eines Patienten | `200` | Token |
 | `PATCH` | `/patients/{id}` | einzelne Felder ändern | `200` | Token |
-| `DELETE` | `/patients/{id}` | endgültig löschen | `204` | Token + `admin` |
+| `DELETE` | `/patients/{id}` | endgültig löschen, **samt Akte** | `204` | Token + `admin` |
 
 ## Die Stammdaten
 
@@ -255,6 +256,36 @@ Frontend sollte vorher zurückfragen.
 Zweimaliges Löschen ist kein Serverfehler: Der zweite Aufruf findet den Patienten nicht
 mehr und antwortet mit `404`.
 
+### Die Akte geht mit
+
+**Mit dem Patienten verschwinden auch alle seine Dokumente und Anhänge**
+([documents-api.md](./documents-api.md#wird-der-patient-gelöscht-geht-die-akte-mit)). Ohne
+das blieben sie liegen: über die API nicht mehr erreichbar, weil jeder Dokument-Endpunkt
+den Patienten voraussetzt, und trotzdem in der Datenbank und auf der Platte.
+
+Reihenfolge: erst der Patient in PostgreSQL, dann die Akte. Bricht es dazwischen ab,
+bleiben verwaiste Anhänge statt eines Patienten ohne seine Dokumente — von beidem ist das
+erste das kleinere Übel.
+
+Wie viele Dokumente dabei weggeräumt wurden, steht im Audit-Trail am Ereignis
+`patient_deleted` unter `detail.documents_removed`.
+
+**Scheitert das Abräumen** — etwa weil MongoDB gerade nicht antwortet oder ein Ordner sich
+nicht entfernen lässt —, kommt **`500`**, und der Patient ist **trotzdem gelöscht**
+(PostgreSQL war zuerst dran). Ein erneutes `DELETE` antwortet deshalb mit `404`; was von
+der Akte übrig ist, muss von Hand nachgeräumt werden. Der Trail-Eintrag wird in diesem Fall
+trotzdem geschrieben, mit `detail.documents_removed: null` — ab dem Löschen ist er der
+einzige Beleg, dass es den Patienten gab, und darf nicht am Aufräumen hängen. `null` heißt
+„unbekannt" und ist absichtlich etwas anderes als `0`; das hieße „der Patient hatte keine".
+
+| Status | Wann |
+| ------ | ---- |
+| `204` | gelöscht, Akte mit abgeräumt |
+| `401` | kein oder ungültiger Token |
+| `403` | angemeldet, aber nicht `admin` |
+| `404` | den Patienten gibt es nicht (mehr) |
+| `500` | Patient gelöscht, Akte nicht vollständig abgeräumt |
+
 ## Fehler
 
 **Jede** Fehlerantwort hat dieselbe Form — unabhängig von Statuscode und Endpunkt:
@@ -408,13 +439,6 @@ Postgres aussagekräftig.
 Pfad, Query-Parameter und JSON-Keys sind englisch (`/patients`, `?q=`, `first_name`).
 Deutsch sind Kommentare, diese Doku und die Oberfläche im Frontend. Dieselbe Regel steht in
 [auth-api.md](./auth-api.md) und in [ADR-0005](./adr/0005-rollen-admin-und-staff.md).
-
-Zwischenzeitlich standen hier `/patienten` und `?suche=`. Der Weg zurück ist bewusst: eine
-Regel, die für die Hälfte der API gilt, ist keine Regel, und die Mischung hätte bei jedem
-neuen Endpunkt wieder verhandelt werden müssen.
-
-ADR-0005 nennt im Fließtext weiterhin `/patienten`. Eine angenommene Entscheidung wird
-nicht nachträglich umgeschrieben — verbindlich sind der Code und diese Datei.
 
 ## Offene Punkte
 

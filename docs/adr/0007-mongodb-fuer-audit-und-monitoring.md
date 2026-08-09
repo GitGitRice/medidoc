@@ -69,3 +69,22 @@ dann bereit.
 - Kein Werkzeug wie Prometheus oder Grafana. Für die Vorführung reichen `docker compose
   logs` und `GET /monitoring/ereignisse`; alles andere wäre Infrastruktur ohne Nutzen im
   Scope.
+
+## Nachtrag Sprint 2 — „startet auch ohne MongoDB" gilt nur noch für den Trail
+
+Als diese Entscheidung fiel, hing an MongoDB nur der Audit-Trail. Seit den Dokumenten
+([documents-api.md](../documents-api.md)) hängt dort auch die Akte jedes Patienten. Die
+Zusicherung oben wird deshalb geteilt:
+
+- **Der Audit-Trail bleibt wie beschrieben.** Ohne `MONGO_URL` läuft er im Prozessspeicher
+  und ist nach dem Neustart weg. Ein verlorener Protokolleintrag ist ärgerlich, mehr nicht
+  — und es ist der Modus, in dem die Tests und die CI laufen.
+- **Die Dokumente nicht.** Ohne `MONGO_URL` antworten die Dokument-Endpunkte mit `500`,
+  statt in den Speicher auszuweichen. Ein Anlegen, das `201` meldet, den Anhang wirklich
+  auf die Platte schreibt und dessen Dokument den Neustart nicht überlebt, ist schlimmer
+  als eine Fehlermeldung: Ein verlorener Befund fällt niemandem auf.
+- **Compose wartet deshalb auf `service_healthy` statt `service_started`.** „Der Container
+  läuft" genügt nicht mehr, wenn die erste Anfrage schon Angaben schreiben will.
+
+Die Anwendung als Ganzes startet weiterhin ohne MongoDB — nur die Dokument-Endpunkte
+antworten dann mit einem Fehler statt mit einer Lüge.
