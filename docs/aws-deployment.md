@@ -6,12 +6,15 @@ lokale Start mit `docker compose up` bleibt unverändert.
 
 ## Öffentliche Adressen
 
-- Frontend: <http://ec2-52-28-116-149.eu-central-1.compute.amazonaws.com:5173>
-- API-Dokumentation: <http://ec2-52-28-116-149.eu-central-1.compute.amazonaws.com:8000/docs>
-- API-Healthcheck: <http://ec2-52-28-116-149.eu-central-1.compute.amazonaws.com:8000/health>
+- Frontend: `http://EC2_PUBLIC_DNS:5173`
+- API-Dokumentation: `http://EC2_PUBLIC_DNS:8000/docs`
+- API-Healthcheck: `http://EC2_PUBLIC_DNS:8000/health`
 
-Die Elastic IP `52.28.116.149` ist fest mit der Instanz verbunden. IP und DNS-Name
-bleiben deshalb auch nach einem Stoppen und erneuten Starten gleich. Die Adresse wird
+`EC2_PUBLIC_DNS` und die aktuelle Elastic IP stehen in den Instanzdetails der
+AWS-Konsole. Sie werden bewusst nicht im öffentlichen Repository festgeschrieben:
+Nach dem Freigeben und späteren Neuzuweisen der Elastic IP wären beide Angaben
+veraltet. Solange dieselbe Elastic IP mit der Instanz verbunden bleibt, bleiben IP
+und DNS-Name auch nach einem Stoppen und erneuten Starten gleich. Die Adresse wird
 berechnet, solange sie im AWS-Konto reserviert ist, und muss nach Projektende wieder
 freigegeben werden.
 
@@ -32,7 +35,7 @@ Internet
 | Region | `eu-central-1` |
 | EC2 | `t2.micro`, Amazon Linux 2023, 1 vCPU, 1 GiB RAM |
 | EBS | 20 GiB `gp3`, verschlüsselt, beim Terminieren mit löschen |
-| Elastic IP | `52.28.116.149`, Name `medidoc-demo-eip` |
+| Elastic IP | aktuelle Adresse aus der AWS-Konsole, Name `medidoc-demo-eip` |
 | Swap | 2 GiB auf dem EBS-Volume |
 | IAM Instance Profile | `EC2-SSM-Role` mit `AmazonSSMManagedInstanceCore` |
 | Security Group | `medidoc-demo-sg` |
