@@ -126,12 +126,12 @@ Unter **EC2 → Network & Security → Elastic IP addresses**:
 4. Die neue Adresse markieren und **Actions → Associate Elastic IP address** wählen.
 5. Resource type **Instance** und `medidoc-demo` auswählen.
 
-Danach in den Instanzdetails den neuen **Public IPv4 DNS** kopieren. Weil der
-Bootstrap zunächst den automatisch vergebenen DNS-Namen kannte, müssen in
-`/opt/medidoc/.env` diese drei Werte auf den neuen Namen gesetzt werden:
+Danach in den Instanzdetails den neuen **Public IPv4 DNS** und die **Elastic IP
+address** kopieren. Weil der Bootstrap zunächst die automatisch vergebenen Werte
+kannte, müssen in `/opt/medidoc/.env` diese drei Werte aktualisiert werden:
 
 ```dotenv
-CORS_ORIGINS=http://NEUER_EC2_DNS_NAME:5173
+CORS_ORIGINS=http://NEUER_EC2_DNS_NAME:5173,http://NEUE_ELASTIC_IP:5173
 VITE_API_URL=http://NEUER_EC2_DNS_NAME:8000
 VITE_ALLOWED_HOST=NEUER_EC2_DNS_NAME
 ```

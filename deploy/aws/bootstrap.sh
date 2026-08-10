@@ -60,6 +60,9 @@ IMDS_TOKEN="$(curl -fsS -X PUT \
 PUBLIC_HOSTNAME="$(curl -fsS \
   -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" \
   http://169.254.169.254/latest/meta-data/public-hostname)"
+PUBLIC_IPV4="$(curl -fsS \
+  -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" \
+  http://169.254.169.254/latest/meta-data/public-ipv4)"
 
 POSTGRES_PASSWORD="$(openssl rand -hex 24)"
 JWT_SECRET="$(openssl rand -hex 32)"
@@ -78,7 +81,7 @@ SEED_ADMIN_EMAIL=anna.admin@medidoc.test
 SEED_ADMIN_PASSWORD=${ADMIN_PASSWORD}
 SEED_STAFF_EMAIL=tom.staff@medidoc.test
 SEED_STAFF_PASSWORD=${STAFF_PASSWORD}
-CORS_ORIGINS=http://${PUBLIC_HOSTNAME}:5173
+CORS_ORIGINS=http://${PUBLIC_HOSTNAME}:5173,http://${PUBLIC_IPV4}:5173
 VITE_API_URL=http://${PUBLIC_HOSTNAME}:8000
 VITE_ALLOWED_HOST=${PUBLIC_HOSTNAME}
 FRONTEND_PORT=5173
