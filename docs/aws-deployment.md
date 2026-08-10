@@ -39,8 +39,9 @@ Internet
 | Administration | AWS Systems Manager Session Manager, kein offener SSH-Port |
 
 Die Security Group erlaubt eingehend nur TCP `5173` und `8000` aus dem Internet.
-Die von Compose veröffentlichten Datenbankports `5432` und `27017` werden von der
-AWS-Firewall blockiert. Port `22` bleibt ebenfalls geschlossen.
+Compose bindet die Datenbankports `5432` und `27017` auf der AWS-Instanz zusätzlich
+nur an `127.0.0.1`; die AWS-Firewall bleibt damit eine zweite Schutzschicht. Port
+`22` bleibt ebenfalls geschlossen.
 
 ## Vollständige Neuerstellung über die AWS-Konsole
 
@@ -176,7 +177,8 @@ User Data ausgeführt. Das Skript:
 3. richtet wegen des kleinen Arbeitsspeichers 2 GiB Swap ein,
 4. klont den Branch `develop` nach `/opt/medidoc`,
 5. erzeugt zufällige Datenbank-, JWT- und Demo-Passwörter,
-6. startet alle Services und legt 25 erfundene Testpatienten an.
+6. bindet beide Datenbankports nur an die lokale Schnittstelle,
+7. startet alle Services und legt 25 erfundene Testpatienten an.
 
 Die erzeugte `.env` liegt nur auf der Instanz und wird nicht eingecheckt. Die
 Demo-Zugangsdaten können nach dem Verbinden über Session Manager gelesen werden:
