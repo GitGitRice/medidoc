@@ -1087,6 +1087,27 @@ class TestOhneMongo:
             documents_store._build_store()
 
 
+class TestZeitzone:
+    """`created_at` kommt aus MongoDB **mit** Zeitzone zurück."""
+
+    def test_der_dokumentenspeicher_liest_zeitpunkte_mit_zeitzone(
+        self, fake_pymongo
+    ):
+        """Ohne `tz_aware` fehlte in der Antwort das `Z` — und zwar nur im Betrieb.
+
+        BSON speichert einen Zeitpunkt in UTC, aber ohne die Zonenangabe. Beim
+        Lesen käme er deshalb ohne `tzinfo` zurück, und aus
+        "2026-07-21T08:10:00Z" würde in der Antwort "2026-07-21T08:10:00" — ein
+        Zeitstempel, den ein Browser als **lokale** Zeit liest. Kein Test gegen
+        den Speicher-Store könnte das sehen: Der gibt das Python-Objekt
+        unverändert zurück, samt Zeitzone. Deshalb steht hier die Einstellung
+        selbst.
+        """
+        documents_store.MongoDocumentStore("mongodb://mongo:27017", "medidoc")
+
+        assert fake_pymongo[0].options["tz_aware"] is True
+
+
 class TestAuditTrail:
     """Anlegen und Löschen sind nachvollziehbar — ohne Patientendaten."""
 

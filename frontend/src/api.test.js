@@ -3,10 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   apiRequest,
+  documentsPath,
   FORBIDDEN_ERROR,
   getCurrentUser,
   jsonBody,
   login,
+  patientPath,
   patientsPath,
   userPath,
   usersPath,
@@ -68,6 +70,44 @@ describe("patientsPath", () => {
       "/patients?limit=25&offset=50",
     );
   });
+
+  it("hängt eine nicht-leere Suche als q an", () => {
+    expect(patientsPath({ q: "hartmann", limit: 25, offset: 0 })).toBe(
+      "/patients?q=hartmann&limit=25&offset=0",
+    );
+  });
+
+  it("lässt q bei leerer Suche weg", () => {
+    expect(patientsPath({ q: "", limit: 25, offset: 0 })).toBe(
+      "/patients?limit=25&offset=0",
+    );
+  });
+
+  it("zeigt auf einen einzelnen Patienten", () => {
+    expect(patientPath(42)).toBe("/patients/42");
+  });
+});
+
+describe("patientPath", () => {
+  it("zeigt auf einen einzelnen Patienten", () => {
+    expect(patientPath(42)).toBe("/patients/42");
+  });
+});
+
+describe("documentsPath", () => {
+  it("zeigt ohne Parameter auf die Dokumente eines Patienten", () => {
+    expect(documentsPath(42)).toBe("/docs/42");
+  });
+
+  it("hängt Suche, Seitengröße und Offset als Query an", () => {
+    expect(documentsPath(42, { q: "mrt", limit: 100, offset: 0 })).toBe(
+      "/docs/42?q=mrt&limit=100&offset=0",
+    );
+  });
+
+  it("lässt q bei leerer Suche weg", () => {
+    expect(documentsPath(42, { q: "", limit: 100 })).toBe("/docs/42?limit=100");
+  });
 });
 
 describe("usersPath", () => {
@@ -125,6 +165,33 @@ describe("Fehlermeldungen", () => {
       message: "E-Mail oder Passwort ist falsch",
       status: 401,
     });
+  });
+
+  it("übernimmt `errors` aus einer 422-Antwort", async () => {
+    stubFetch(
+      {
+        status: 422,
+        message: "Pflichtfelder fehlen: last_name",
+        errors: [{ field: "last_name", message: "Feld ist erforderlich" }],
+      },
+      { status: 422 },
+    );
+
+    const error = await login("a@b.test", "falsch").catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      status: 422,
+      message: "Pflichtfelder fehlen: last_name",
+      errors: [{ field: "last_name", message: "Feld ist erforderlich" }],
+    });
+  });
+
+  it("lässt `errors` `null`, wenn die Antwort keine Feldfehler mitbringt", async () => {
+    stubFetch({ status: 401, message: "Anmeldung erforderlich" }, { status: 401 });
+
+    const error = await login("a@b.test", "falsch").catch((caught) => caught);
+
+    expect(error.errors).toBeNull();
   });
 
   it("zeigt bei einem FastAPI-Validierungsfehler keinen Objekt-Müll", async () => {

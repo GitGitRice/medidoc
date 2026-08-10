@@ -1,14 +1,21 @@
 import DocumentCard from '../components/DocumentCard';
 
-function DocumentList({ documents, searchTextDocuments, error, editingId, onDelete,
+/**
+ * Die Dokumente einer Akte — oder der Grund, warum keine dastehen.
+ *
+ * Zwei Leerzustände, weil es zwei verschiedene Lagen sind: eine Akte ohne
+ * Dokumente ist ein gültiger Zustand (docs/documents-api.md), eine Suche ohne
+ * Treffer ein Hinweis auf den Suchtext.
+ */
+function DocumentList({ documents, searchTextDocuments, editingId, onDelete,
   onStartEdit, onCancelEdit, onUpdateDocument}) {
   if (documents.length === 0 &&  searchTextDocuments.trim() === "") {
     return (
       <div className="empty-state">
         <div className="empty-state-icon">📑</div>
-        <h3 className="empty-state-title">Keine eigenen Dokumente vorhanden</h3>
+        <h3 className="empty-state-title">Keine Dokumente in dieser Akte</h3>
         <p className="empty-state-text">
-          Füge dein erstes Dokument hinzu, um loszulegen!
+          Für diesen Patienten wurde noch kein Dokument angelegt.
         </p>
       </div>
     );
@@ -34,7 +41,6 @@ function DocumentList({ documents, searchTextDocuments, error, editingId, onDele
           document={document}
           isEditing={editingId === document.id}
           onDelete={onDelete}
-          error={error}
           onStartEdit={onStartEdit}
           onCancelEdit={onCancelEdit}
           onUpdateDocument={onUpdateDocument}

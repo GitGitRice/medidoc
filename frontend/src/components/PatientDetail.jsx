@@ -31,6 +31,25 @@ export default function PatientDetail( { patient } ) {
     }
     return value;
   };
+
+  // Fast jedes Feld eines Patienten darf fehlen (docs/patients-api.md) — nur
+  // Name und Geburtsdatum nicht. Die Versicherungsart ist dann nicht "privat",
+  // sondern unbekannt, und dafuer steht kein Etikett am Kopf.
+  const insuranceLabel = {
+    statutory: "Gesetzlich versichert",
+    private: "Privat versichert",
+  }[patient.insurance_type];
+
+  // Die Adresse ist eine Zeile aus drei Feldern, von denen jedes fehlen darf.
+  const address = [
+    displayValue(patient.street),
+    [displayValue(patient.postal_code), displayValue(patient.city)]
+      .filter(Boolean)
+      .join(" "),
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <div style={styles.patient_page}>
       <section style={styles.patient_card}>
@@ -45,11 +64,9 @@ export default function PatientDetail( { patient } ) {
             </p>
           </div>
 
-          <span style={styles.patient_badge}>
-            {displayValue(patient.insurance_type === "statutory"
-              ? "Gesetzlich versichert"
-              : "Privat versichert")}
-          </span>
+          {insuranceLabel && (
+            <span style={styles.patient_badge}>{insuranceLabel}</span>
+          )}
         </div>
 
         <div style={styles.patient_divider} />
@@ -58,32 +75,34 @@ export default function PatientDetail( { patient } ) {
           <h2 style={styles.patient_sectionTitle}>Kontaktdaten</h2>
 
           <div style={styles.patient_grid}>
+            {/* Ohne Wert kein Link: `mailto:` und `tel:` ins Leere sehen aus
+                wie eine Adresse und sind keine. `InfoField` zeigt dann "—". */}
             <InfoField
               label="E-Mail"
               value={
-                <a href={`mailto:${displayValue(patient.email)}`} style={styles.link}>
-                  {displayValue(patient.email)}
-                </a>
+                patient.email && (
+                  <a href={`mailto:${patient.email}`} style={styles.patient_link}>
+                    {patient.email}
+                  </a>
+                )
               }
             />
 
             <InfoField
               label="Telefon"
               value={
-                <a
-                  href={`tel:${displayValue(patient.phone).replace(/\s/g, "")}`}
-                  style={styles.patient_link}
-                >
-                  {displayValue(patient.phone)}
-                </a>
+                patient.phone && (
+                  <a
+                    href={`tel:${patient.phone.replace(/\s/g, "")}`}
+                    style={styles.patient_link}
+                  >
+                    {patient.phone}
+                  </a>
+                )
               }
             />
 
-            <InfoField
-              label="Adresse"
-              value={`${displayValue(patient.street)}, ${displayValue(patient.postal_code)} ${displayValue(patient.city)}`}
-              fullWidth
-            />
+            <InfoField label="Adresse" value={address} fullWidth />
           </div>
         </div>
 
@@ -105,7 +124,9 @@ export default function PatientDetail( { patient } ) {
 
         <div style={styles.patient_section}>
           <h2 style={styles.patient_sectionTitle}>Notizen</h2>
-          <div style={styles.patient_notes}>{displayValue(patient.notes)}</div>
+          <div style={styles.patient_notes}>
+            {patient.notes || "Keine Notizen hinterlegt."}
+          </div>
         </div>
 
         <div style={styles.patient_footer}>
