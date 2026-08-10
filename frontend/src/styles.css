@@ -1,7 +1,7 @@
 /* Bewusst neutral. Produktfarben und endgültiges Layout stehen noch nicht fest. */
 :root {
   font-family: system-ui, sans-serif;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 body {
@@ -13,34 +13,42 @@ button,
 input {
   font: inherit;
 }
+/*
+ * Nur noch, was MUI nicht abdeckt.
+ *
+ * Frueher standen hier Regeln auf blanken Elementnamen — `form`, `input`,
+ * `button`. Die trafen nicht nur die selbstgebauten Seiten, sondern jedes
+ * MUI-Formular mit: Der Dialog "Benutzer anlegen" wurde von
+ * `form { max-inline-size: 24rem }` auf 384px zusammengedrueckt, obwohl der
+ * Dialog selbst 600px breit war. Deshalb haengen die Regeln jetzt an
+ * `.plain-form` und gelten nur dort, wo sie gemeint sind: auf der
+ * Anmeldeseite, die bewusst ohne MUI auskommt.
+ *
+ * Schrift, Randabstaende und Kastenmodell kommen aus `CssBaseline` und dem
+ * Theme (`theme.js`) — hier steht dazu nichts mehr.
+ */
 
 .page {
-  max-inline-size: 42rem;
+  max-inline-size: 75rem;
   margin-inline: auto;
   padding: 1rem;
 }
 
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.plain-form {
+  display: grid;
   gap: 1rem;
+  max-inline-size: 24rem;
 }
 
-form,
-label {
+.plain-form label {
   display: grid;
   gap: 0.5rem;
 }
 
-form {
-  max-inline-size: 24rem;
-  gap: 1rem;
-}
-
-input,
-button {
+.plain-form input,
+.plain-form button {
   padding: 0.5rem;
+  font: inherit;
 }
 
 .error {

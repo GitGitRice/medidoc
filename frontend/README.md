@@ -1,7 +1,7 @@
 # MediDoc frontend
 
-Minimaler React-Client für die Anmeldung aus Issue #17. Farben, Branding und das
-endgültige Layout sind bewusst noch nicht festgelegt.
+React-Client mit Anmeldung, geschütztem Routing und der Patientenübersicht. Farben,
+Branding und das endgültige Layout sind bewusst noch nicht festgelegt.
 
 ## Lokal starten
 

@@ -38,21 +38,23 @@ services:
     working_dir: /app
     volumes:
       - ./backend:/app
-      # Anhaenge liegen als Dateien im Volume; MongoDB speichert nur Metadaten und Pfad.
-      - document_attachments:/data/attachments
+      - uploads_data:/data/uploads
     env_file:
       - .env
     environment:
       # Im Compose-Netz heisst die Datenbank wie ihr Service, nicht localhost.
       POSTGRES_HOST: postgres
       MONGO_URL: mongodb://mongo:27017
+      UPLOAD_DIR: /data/uploads
       LOG_JSON: "true"
-      ATTACHMENTS_DIR: /data/attachments
     ports:
       - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
+      # service_healthy, nicht service_started: MongoDB haelt seit den Dokumenten
+      # nicht mehr nur den Audit-Trail, sondern auch die Angaben zu jedem
+      # Dokument. Ein "der Container laeuft" genuegt dafuer nicht.
       mongo:
         condition: service_healthy
     command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
@@ -82,4 +84,4 @@ volumes:
   postgres_data:
   frontend_node_modules:
   mongo_data:
-  document_attachments:
+  uploads_data:

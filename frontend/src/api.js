@@ -45,17 +45,24 @@ async function readResponse(response) {
 /**
  * Die Meldung aus einer Fehlerantwort — oder ein neutraler Satz.
  *
- * `detail` ist bei uns ein String (docs/auth-api.md). FastAPI selbst antwortet
- * bei einem Validierungsfehler aber mit einer *Liste* von Objekten unter
- * demselben Schlüssel. Ungeprüft übernommen stünde davon "[object Object]" in
- * der Oberfläche, deshalb wird hier auf einen String bestanden.
+ * `message` ist unser eigenes Feld (app/core/errors.py) und bei jeder eigenen
+ * Fehlerantwort ein String — das ist der Weg, auf den die Backend-Doku selbst
+ * verweist. `detail` bleibt als Fallback für Antworten, die (noch) kein
+ * `message` mitbringen. Roh-FastAPI liefert bei einem Validierungsfehler dort
+ * eine *Liste* von Objekten unter demselben Schlüssel — ungeprüft übernommen
+ * stünde davon "[object Object]" in der Oberfläche, deshalb wird auf einen
+ * String bestanden.
  *
  * Bei `403` steht die Meldung auch dann fest, wenn die Antwort keine mitbringt:
  * Der Fall ist immer derselbe — angemeldet, aber die Rolle reicht nicht — und
  * dafür ist "Die Anfrage ist fehlgeschlagen." keine Auskunft.
  */
 function errorMessage(body, status) {
-  if (typeof body === "object" && typeof body?.detail === "string") {
+  if (typeof body?.message === "string") {
+    return body.message;
+  }
+
+  if (typeof body?.detail === "string") {
     return body.detail;
   }
 
@@ -109,4 +116,67 @@ export function login(email, password) {
 
 export function getCurrentUser(token, options = {}) {
   return apiRequest("/auth/me", { ...options, token });
+}
+
+/** Hängt `limit` und `offset` an einen Pfad, soweit gesetzt. */
+function withPaging(path, { limit, offset } = {}) {
+  const params = new URLSearchParams();
+  if (limit != null) {
+    params.set("limit", limit);
+  }
+  if (offset != null) {
+    params.set("offset", offset);
+  }
+
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
+}
+
+/**
+ * Der Pfad für `GET /patients`, mit Suche und Seitengröße.
+ */
+export function patientsPath({ q, limit, offset } = {}) {
+  const params = new URLSearchParams();
+  if (q) {
+    params.set("q", q);
+  }
+  if (limit != null) {
+    params.set("limit", limit);
+  }
+  if (offset != null) {
+    params.set("offset", offset);
+  }
+
+  const query = params.toString();
+  return query ? `/patients?${query}` : "/patients";
+}
+
+/**
+ * Der Pfad für `GET /users` und `POST /users` — nur für `admin`.
+ *
+ * Die Liste enthält auch deaktivierte Benutzer; erkennbar sind sie an
+ * `is_active`.
+ */
+export function usersPath({ limit, offset } = {}) {
+  return withPaging("/users", { limit, offset });
+}
+
+/** Der Pfad für `PATCH /users/{id}`. */
+export function userPath(userId) {
+  return `/users/${userId}`;
+}
+
+/**
+ * Die Options für einen Request mit JSON-Rumpf.
+ *
+ * Steht hier und nicht in den Seiten, damit `Content-Type` und
+ * `JSON.stringify` nicht an jeder Aufrufstelle neu zusammengesetzt werden —
+ * ein vergessener Header wäre ein `422`, das nach einem Datenfehler aussieht.
+ */
+export function jsonBody(method, data) {
+  return {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  };
 }
