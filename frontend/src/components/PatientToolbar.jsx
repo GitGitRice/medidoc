@@ -27,7 +27,7 @@ export function PatientToolbar({ onSearch, onCreateClick, canCreate }) {
     >
       <PatientSearch onSearch={onSearch} />
 
-      <Stack direction="row" spacing={1}>
+      <Stack direction="row" spacing={1} sx={{ marginInlineEnd: 2 }}>
         {canCreate && (
           <Tooltip title="Neuer Patient">
             <Fab
@@ -35,8 +35,9 @@ export function PatientToolbar({ onSearch, onCreateClick, canCreate }) {
               color="primary"
               aria-label="Neuer Patient"
               onClick={onCreateClick}
+              sx={{ width: 32, height: 32, minHeight: 32 }}
             >
-              <AddOutlinedIcon />
+              <AddOutlinedIcon sx={{ fontSize: 18 }} />
             </Fab>
           </Tooltip>
         )}
