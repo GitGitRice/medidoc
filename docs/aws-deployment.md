@@ -180,6 +180,10 @@ User Data ausgeführt. Das Skript:
 6. bindet beide Datenbankports nur an die lokale Schnittstelle,
 7. startet alle Services und legt 25 erfundene Testpatienten an.
 
+Der Bootstrap ist ausschließlich für die Ersteinrichtung gedacht. Existiert bereits
+`/opt/medidoc/.env`, bricht er ab, bevor Repository oder Zugangsdaten überschrieben
+werden. Aktualisierungen erfolgen stattdessen mit den Befehlen im nächsten Abschnitt.
+
 Die erzeugte `.env` liegt nur auf der Instanz und wird nicht eingecheckt. Die
 Demo-Zugangsdaten können nach dem Verbinden über Session Manager gelesen werden:
 

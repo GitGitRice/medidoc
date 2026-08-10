@@ -12,6 +12,12 @@ BUILDX_VERSION="v0.17.1"
 
 echo "MediDoc bootstrap started"
 
+if [[ -f "${APP_DIR}/.env" ]]; then
+  echo "${APP_DIR}/.env existiert bereits. Bootstrap bricht ab." >&2
+  echo "Sonst passen neue Zugangsdaten nicht mehr zu den vorhandenen Datenbank-Volumes." >&2
+  exit 1
+fi
+
 dnf update -y
 dnf install -y docker git
 systemctl enable --now docker
