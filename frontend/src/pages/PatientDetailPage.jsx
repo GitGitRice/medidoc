@@ -9,6 +9,7 @@ import Typography from "@mui/material/Typography";
 
 import { documentsPath, patientPath } from "../api.js";
 import { useAuth } from "../auth/AuthContext.jsx";
+import { CreateDocumentCard } from "../components/CreateDocumentCard.jsx";
 import DocumentList from "../components/DocumentList";
 import PatientDetail from "../components/PatientDetail";
 
@@ -84,6 +85,15 @@ export function PatientDetailPage() {
     setDocuments((current) => current.filter((document) => document.id !== id));
   }
 
+  async function handleCreateDocument(formData) {
+    const createdDocument = await apiFetch(documentsPath(patientId), {
+      method: "POST",
+      body: formData,
+    });
+
+    setDocuments((current) => [createdDocument, ...current]);
+  }
+
   /** Wie beim Löschen: bis auf Weiteres nur in der Anzeige (Issue #78). */
   function handleUpdateDocument(id, _patientId, changes) {
     setDocuments((current) =>
@@ -156,6 +166,8 @@ export function PatientDetailPage() {
             onChange={(event) => setSearchTextDocuments(event.target.value)}
           />
         </div>
+
+        <CreateDocumentCard onCreate={handleCreateDocument} />
 
         <DocumentList
           documents={filteredDocuments}

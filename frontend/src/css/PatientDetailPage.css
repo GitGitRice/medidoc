@@ -618,6 +618,7 @@
 .document-actions-right {
   display: flex;
   gap: 8px;
+  margin-left: auto;
 }
 
 .document-type-badge {
