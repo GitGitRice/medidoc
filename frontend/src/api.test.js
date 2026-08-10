@@ -68,6 +68,18 @@ describe("patientsPath", () => {
       "/patients?limit=25&offset=50",
     );
   });
+
+  it("hängt eine nicht-leere Suche als q an", () => {
+    expect(patientsPath({ q: "hartmann", limit: 25, offset: 0 })).toBe(
+      "/patients?q=hartmann&limit=25&offset=0",
+    );
+  });
+
+  it("lässt q bei leerer Suche weg", () => {
+    expect(patientsPath({ q: "", limit: 25, offset: 0 })).toBe(
+      "/patients?limit=25&offset=0",
+    );
+  });
 });
 
 describe("usersPath", () => {

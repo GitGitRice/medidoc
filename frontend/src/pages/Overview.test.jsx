@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, apiRequest, getCurrentUser } from "../api.js";
 import { AuthProvider } from "../auth/AuthContext.jsx";
@@ -190,7 +190,7 @@ describe("Overview", () => {
 
   it("laedt bei Klick auf die naechste Seite mit passendem offset nach", async () => {
     apiRequest.mockResolvedValue({
-      items: Array.from({ length: 25 }, (_, i) => ({
+      items: Array.from({ length: 10 }, (_, i) => ({
         id: i + 1,
         first_name: `Vorname${i}`,
         last_name: `Nachname${i}`,
@@ -198,7 +198,7 @@ describe("Overview", () => {
         insurance_number: null,
       })),
       total: 30,
-      limit: 25,
+      limit: 10,
       offset: 0,
     });
 
@@ -206,7 +206,7 @@ describe("Overview", () => {
 
     await screen.findByRole("cell", { name: "Nachname0" });
     expect(apiRequest).toHaveBeenLastCalledWith(
-      "/patients?limit=25&offset=0",
+      "/patients?limit=10&offset=0",
       expect.objectContaining({ token: "stored-token" }),
     );
 
@@ -214,7 +214,7 @@ describe("Overview", () => {
 
     await waitFor(() => {
       expect(apiRequest).toHaveBeenLastCalledWith(
-        "/patients?limit=25&offset=25",
+        "/patients?limit=10&offset=10",
         expect.objectContaining({ token: "stored-token" }),
       );
     });
@@ -250,7 +250,7 @@ describe("Overview", () => {
 
   it("beschriftet die Seitensteuerung auf Deutsch", async () => {
     apiRequest.mockResolvedValue({
-      items: Array.from({ length: 25 }, (_, i) => ({
+      items: Array.from({ length: 10 }, (_, i) => ({
         id: i + 1,
         first_name: `Vorname${i}`,
         last_name: `Nachname${i}`,
@@ -258,7 +258,7 @@ describe("Overview", () => {
         insurance_number: null,
       })),
       total: 30,
-      limit: 25,
+      limit: 10,
       offset: 0,
     });
 
@@ -267,11 +267,36 @@ describe("Overview", () => {
     await screen.findByRole("cell", { name: "Nachname0" });
 
     expect(screen.getByText("Zeilen pro Seite:")).toBeInTheDocument();
-    expect(screen.getByText("1–25 von 30")).toBeInTheDocument();
+    expect(screen.getByText("1–10 von 30")).toBeInTheDocument();
     expect(screen.getByLabelText("Erste Seite")).toBeInTheDocument();
     expect(screen.getByLabelText("Vorherige Seite")).toBeInTheDocument();
     expect(screen.getByLabelText("Nächste Seite")).toBeInTheDocument();
     expect(screen.getByLabelText("Letzte Seite")).toBeInTheDocument();
+  });
+
+  it("laedt standardmaeßig 10 Patienten pro Seite", async () => {
+    apiRequest.mockResolvedValue({
+      items: Array.from({ length: 10 }, (_, i) => ({
+        id: i + 1,
+        first_name: `Vorname${i}`,
+        last_name: `Nachname${i}`,
+        date_of_birth: "1990-01-01",
+        insurance_number: null,
+      })),
+      total: 12,
+      limit: 10,
+      offset: 0,
+    });
+
+    renderOverview();
+
+    await screen.findByRole("cell", { name: "Nachname0" });
+
+    expect(apiRequest).toHaveBeenLastCalledWith(
+      "/patients?limit=10&offset=0",
+      expect.objectContaining({ token: "stored-token" }),
+    );
+    expect(screen.getByText("1–10 von 12")).toBeInTheDocument();
   });
 
   it("übernimmt fehlende Versichertennummer nicht als leere Zelle", async () => {
@@ -296,5 +321,160 @@ describe("Overview", () => {
       expect(screen.getByRole("cell", { name: "Musterfrau" })).toBeInTheDocument(),
     );
     expect(screen.getByRole("cell", { name: "–" })).toBeInTheDocument();
+  });
+
+  describe("Suche", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("zeigt das Suchfeld über der Tabelle", async () => {
+      apiRequest.mockResolvedValue({ items: [patient], total: 1, limit: 25, offset: 0 });
+
+      renderOverview();
+
+      const searchField = await screen.findByLabelText("Suche nach Name oder Vorname");
+      const table = await screen.findByRole("table");
+
+      expect(
+        searchField.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("löst beim Tippen nicht bei jedem Tastendruck eine Anfrage aus", async () => {
+      apiRequest.mockResolvedValue({ items: [patient], total: 1, limit: 25, offset: 0 });
+
+      renderOverview();
+      const searchField = await screen.findByLabelText("Suche nach Name oder Vorname");
+      apiRequest.mockClear();
+
+      vi.useFakeTimers();
+      fireEvent.change(searchField, { target: { value: "h" } });
+      fireEvent.change(searchField, { target: { value: "ha" } });
+      fireEvent.change(searchField, { target: { value: "har" } });
+
+      expect(apiRequest).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+
+      expect(apiRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it("sendet die entprellte Suche als q-Parameter, Seitengröße und Offset bleiben erhalten", async () => {
+      apiRequest.mockResolvedValue({ items: [patient], total: 1, limit: 25, offset: 0 });
+
+      renderOverview();
+      const searchField = await screen.findByLabelText("Suche nach Name oder Vorname");
+      apiRequest.mockClear();
+
+      vi.useFakeTimers();
+      fireEvent.change(searchField, { target: { value: "hartmann" } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+
+      expect(apiRequest).toHaveBeenLastCalledWith(
+        "/patients?q=hartmann&limit=10&offset=0",
+        expect.objectContaining({ token: "stored-token" }),
+      );
+    });
+
+    it("setzt die Seite auf 0 zurück, wenn sich die Suche ändert", async () => {
+      apiRequest.mockResolvedValue({
+        items: Array.from({ length: 10 }, (_, i) => ({
+          id: i + 1,
+          first_name: `Vorname${i}`,
+          last_name: `Nachname${i}`,
+          date_of_birth: "1990-01-01",
+          insurance_number: null,
+        })),
+        total: 30,
+        limit: 10,
+        offset: 0,
+      });
+
+      renderOverview();
+      await screen.findByRole("cell", { name: "Nachname0" });
+
+      fireEvent.click(screen.getByLabelText("Nächste Seite"));
+      await waitFor(() => {
+        expect(apiRequest).toHaveBeenLastCalledWith(
+          "/patients?limit=10&offset=10",
+          expect.objectContaining({ token: "stored-token" }),
+        );
+      });
+
+      vi.useFakeTimers();
+      const searchField = screen.getByLabelText("Suche nach Name oder Vorname");
+      fireEvent.change(searchField, { target: { value: "hartmann" } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+
+      expect(apiRequest).toHaveBeenLastCalledWith(
+        "/patients?q=hartmann&limit=10&offset=0",
+        expect.objectContaining({ token: "stored-token" }),
+      );
+    });
+
+    it("zeigt eine eigene Meldung, wenn die Suche nichts findet", async () => {
+      apiRequest
+        .mockResolvedValueOnce({ items: [patient], total: 1, limit: 25, offset: 0 })
+        .mockResolvedValueOnce({ items: [], total: 0, limit: 25, offset: 0 });
+
+      renderOverview();
+      const searchField = await screen.findByLabelText("Suche nach Name oder Vorname");
+
+      vi.useFakeTimers();
+      fireEvent.change(searchField, { target: { value: "nichtvorhanden" } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+
+      expect(screen.getByText("Keine Treffer")).toBeInTheDocument();
+      expect(
+        screen.getByText('Für „nichtvorhanden" wurden keine Patienten gefunden.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Keine Patienten vorhanden")).not.toBeInTheDocument();
+    });
+
+    it("zeigt bei leerer Datenbank ohne aktive Suche weiterhin die allgemeine Leermeldung", async () => {
+      apiRequest.mockResolvedValue({ items: [], total: 0, limit: 25, offset: 0 });
+
+      renderOverview();
+
+      expect(await screen.findByText("Keine Patienten vorhanden")).toBeInTheDocument();
+      expect(screen.queryByText("Keine Treffer")).not.toBeInTheDocument();
+    });
+
+    it("zeigt nach dem Leeren der Suche wieder die vollständige Liste", async () => {
+      apiRequest
+        .mockResolvedValueOnce({ items: [patient], total: 1, limit: 25, offset: 0 })
+        .mockResolvedValueOnce({ items: [], total: 0, limit: 25, offset: 0 })
+        .mockResolvedValueOnce({ items: [patient], total: 1, limit: 25, offset: 0 });
+
+      renderOverview();
+      const searchField = await screen.findByLabelText("Suche nach Name oder Vorname");
+
+      vi.useFakeTimers();
+      fireEvent.change(searchField, { target: { value: "nichtvorhanden" } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(screen.getByText("Keine Treffer")).toBeInTheDocument();
+
+      fireEvent.change(searchField, { target: { value: "" } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+
+      expect(apiRequest).toHaveBeenLastCalledWith(
+        "/patients?limit=10&offset=0",
+        expect.objectContaining({ token: "stored-token" }),
+      );
+      expect(screen.getByRole("cell", { name: "Mustermann" })).toBeInTheDocument();
+    });
   });
 });

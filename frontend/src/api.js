@@ -133,10 +133,22 @@ function withPaging(path, { limit, offset } = {}) {
 }
 
 /**
- * Der Pfad für `GET /patients`, mit Seitengröße.
+ * Der Pfad für `GET /patients`, mit Suche und Seitengröße.
  */
-export function patientsPath({ limit, offset } = {}) {
-  return withPaging("/patients", { limit, offset });
+export function patientsPath({ q, limit, offset } = {}) {
+  const params = new URLSearchParams();
+  if (q) {
+    params.set("q", q);
+  }
+  if (limit != null) {
+    params.set("limit", limit);
+  }
+  if (offset != null) {
+    params.set("offset", offset);
+  }
+
+  const query = params.toString();
+  return query ? `/patients?${query}` : "/patients";
 }
 
 /**
