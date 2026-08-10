@@ -72,7 +72,7 @@ services:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
       # Vite blockiert unbekannte Host-Header. Lokal bleibt localhost erlaubt; auf AWS
       # wird hier der öffentliche EC2-DNS-Name explizit gesetzt.
-      __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: ${VITE_ALLOWED_HOST:-localhost}
+      VITE_ALLOWED_HOST: ${VITE_ALLOWED_HOST:-localhost}
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
