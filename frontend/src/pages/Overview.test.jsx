@@ -553,10 +553,10 @@ describe("Overview", () => {
 
       it("deaktiviert Speichern bei einem Vornamen aus nur Leerzeichen", async () => {
         const dialog = await openFullyPopulatedDialog();
+        const input = within(dialog).getByLabelText(/^Vorname/);
 
-        fireEvent.change(within(dialog).getByLabelText(/^Vorname/), {
-          target: { value: "   " },
-        });
+        fireEvent.change(input, { target: { value: "   " } });
+        fireEvent.blur(input);
 
         expect(
           within(dialog).getByRole("button", { name: "Änderungen speichern" }),
@@ -582,10 +582,10 @@ describe("Overview", () => {
       it("deaktiviert Speichern fuer ein Geburtsdatum in der Zukunft", async () => {
         const dialog = await openFullyPopulatedDialog();
         const nextYear = String(new Date().getFullYear() + 1);
+        const input = within(dialog).getByLabelText(/^Geburtsdatum/);
 
-        fireEvent.change(within(dialog).getByLabelText(/^Geburtsdatum/), {
-          target: { value: `${nextYear}-01-01` },
-        });
+        fireEvent.change(input, { target: { value: `${nextYear}-01-01` } });
+        fireEvent.blur(input);
 
         expect(
           within(dialog).getByRole("button", { name: "Änderungen speichern" }),
@@ -623,6 +623,41 @@ describe("Overview", () => {
       expect(
         within(dialog).queryByRole("progressbar", { name: "Patientendaten werden geladen" }),
       ).not.toBeInTheDocument();
+    });
+
+    it("zeigt beim Öffnen keine Pflichtfeld-Fehlermeldungen", async () => {
+      apiRequest.mockResolvedValue({ items: [patient], total: 1, limit: 10, offset: 0 });
+
+      renderOverview();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Neuer Patient" }));
+      const dialog = await screen.findByRole("dialog");
+
+      expect(within(dialog).queryByText("darf nicht leer sein")).not.toBeInTheDocument();
+      expect(within(dialog).queryByText("Feld ist erforderlich")).not.toBeInTheDocument();
+      expect(
+        within(dialog).getByRole("button", { name: "Patient anlegen" }),
+      ).toBeDisabled();
+    });
+
+    it("zeigt die Fehlermeldung eines Pflichtfelds erst nach dem Verlassen", async () => {
+      apiRequest.mockResolvedValue({ items: [patient], total: 1, limit: 10, offset: 0 });
+
+      renderOverview();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Neuer Patient" }));
+      const dialog = await screen.findByRole("dialog");
+      const input = within(dialog).getByLabelText(/^Nachname/);
+
+      expect(within(dialog).queryByText("darf nicht leer sein")).not.toBeInTheDocument();
+
+      fireEvent.blur(input);
+
+      expect(within(dialog).getByText("darf nicht leer sein")).toBeInTheDocument();
+
+      fireEvent.change(input, { target: { value: "Musterfrau" } });
+
+      expect(within(dialog).queryByText("darf nicht leer sein")).not.toBeInTheDocument();
     });
 
     it("prueft Pflichtfelder vor dem Absenden", async () => {

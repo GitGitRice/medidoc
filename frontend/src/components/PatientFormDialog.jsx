@@ -117,13 +117,20 @@ export function PatientFormDialog({
   onSave,
 }) {
   const [form, setForm] = useState(EMPTY_FORM);
+  // Welche Felder wurden schon verlassen — steuert, ob ein Client-Fehler
+  // schon angezeigt wird. Ohne das waere z. B. "Neuer Patient" beim Oeffnen
+  // sofort voller roter Pflichtfelder, bevor der Nutzer ueberhaupt etwas
+  // eingegeben hat.
+  const [touched, setTouched] = useState({});
 
   useEffect(() => {
     if (mode === "edit" && patient) {
       setForm(formFromPatient(patient));
+      setTouched({});
     }
     if (mode === "create" && open) {
       setForm(EMPTY_FORM);
+      setTouched({});
     }
   }, [mode, patient, open]);
 
@@ -133,12 +140,27 @@ export function PatientFormDialog({
     };
   }
 
+  function handleBlur(field) {
+    return () => {
+      setTouched((current) => ({ ...current, [field]: true }));
+    };
+  }
+
   // Live statt nur bei Submit: Pflichtfelder sind bei jedem Tastendruck
   // geprueft, damit der Speichern-Button sofort reagiert, wenn ein Pflichtfeld
   // geleert wird — nicht erst nach einem Absendeversuch.
   const clientErrors = validate(form);
   const hasClientErrors = Object.keys(clientErrors).length > 0;
-  const fieldErrors = { ...serverFieldErrors(error), ...clientErrors };
+  const serverErrors = serverFieldErrors(error);
+  // Server-Fehler gelten unabhaengig von `touched` sofort — Client-Fehler nur
+  // fuer Felder, die der Nutzer schon verlassen hat.
+  const fieldErrors = { ...clientErrors };
+  for (const field of Object.keys(fieldErrors)) {
+    if (!touched[field]) {
+      delete fieldErrors[field];
+    }
+  }
+  Object.assign(fieldErrors, serverErrors);
   const showForm = mode === "create" || (!isLoading && !loadError && patient !== null);
   const saveDisabled = isSaving || !showForm || hasClientErrors;
 
@@ -186,6 +208,7 @@ export function PatientFormDialog({
                   label="Vorname"
                   value={form.first_name}
                   onChange={handleChange("first_name")}
+                  onBlur={handleBlur("first_name")}
                   required
                   fullWidth
                   error={Boolean(fieldErrors.first_name)}
@@ -196,6 +219,7 @@ export function PatientFormDialog({
                   label="Nachname"
                   value={form.last_name}
                   onChange={handleChange("last_name")}
+                  onBlur={handleBlur("last_name")}
                   required
                   fullWidth
                   error={Boolean(fieldErrors.last_name)}
@@ -210,6 +234,7 @@ export function PatientFormDialog({
                   type="date"
                   value={form.date_of_birth}
                   onChange={handleChange("date_of_birth")}
+                  onBlur={handleBlur("date_of_birth")}
                   required
                   fullWidth
                   slotProps={{ inputLabel: { shrink: true } }}
@@ -221,6 +246,7 @@ export function PatientFormDialog({
                   label="E-Mail"
                   value={form.email}
                   onChange={handleChange("email")}
+                  onBlur={handleBlur("email")}
                   fullWidth
                   error={Boolean(fieldErrors.email)}
                   helperText={fieldErrors.email}
@@ -233,6 +259,7 @@ export function PatientFormDialog({
                   label="Telefon"
                   value={form.phone}
                   onChange={handleChange("phone")}
+                  onBlur={handleBlur("phone")}
                   fullWidth
                   error={Boolean(fieldErrors.phone)}
                   helperText={fieldErrors.phone}
@@ -242,6 +269,7 @@ export function PatientFormDialog({
                   label="Straße"
                   value={form.street}
                   onChange={handleChange("street")}
+                  onBlur={handleBlur("street")}
                   fullWidth
                   error={Boolean(fieldErrors.street)}
                   helperText={fieldErrors.street}
@@ -254,6 +282,7 @@ export function PatientFormDialog({
                   label="PLZ"
                   value={form.postal_code}
                   onChange={handleChange("postal_code")}
+                  onBlur={handleBlur("postal_code")}
                   fullWidth
                   error={Boolean(fieldErrors.postal_code)}
                   helperText={fieldErrors.postal_code}
@@ -263,6 +292,7 @@ export function PatientFormDialog({
                   label="Ort"
                   value={form.city}
                   onChange={handleChange("city")}
+                  onBlur={handleBlur("city")}
                   fullWidth
                   error={Boolean(fieldErrors.city)}
                   helperText={fieldErrors.city}
@@ -275,6 +305,7 @@ export function PatientFormDialog({
                   label="Versicherungsträger"
                   value={form.insurance_provider}
                   onChange={handleChange("insurance_provider")}
+                  onBlur={handleBlur("insurance_provider")}
                   fullWidth
                   error={Boolean(fieldErrors.insurance_provider)}
                   helperText={fieldErrors.insurance_provider}
@@ -284,6 +315,7 @@ export function PatientFormDialog({
                   label="Versichertennummer"
                   value={form.insurance_number}
                   onChange={handleChange("insurance_number")}
+                  onBlur={handleBlur("insurance_number")}
                   fullWidth
                   error={Boolean(fieldErrors.insurance_number)}
                   helperText={fieldErrors.insurance_number}
@@ -296,6 +328,7 @@ export function PatientFormDialog({
                 select
                 value={form.insurance_type}
                 onChange={handleChange("insurance_type")}
+                onBlur={handleBlur("insurance_type")}
                 error={Boolean(fieldErrors.insurance_type)}
                 helperText={fieldErrors.insurance_type}
                 disabled={isSaving}
@@ -310,6 +343,7 @@ export function PatientFormDialog({
                 label="Notizen"
                 value={form.notes}
                 onChange={handleChange("notes")}
+                onBlur={handleBlur("notes")}
                 multiline
                 minRows={3}
                 fullWidth
