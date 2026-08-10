@@ -5,6 +5,9 @@ set -Eeuo pipefail
 exec > >(tee /var/log/medidoc-bootstrap.log) 2>&1
 
 REPOSITORY_URL="https://github.com/GitGitRice/medidoc.git"
+# Der bewegliche Branch ist fuer die Demo beabsichtigt: So kann der dokumentierte
+# Betriebsablauf neue Stände mit `git pull` einspielen. Release-Deployments sollten
+# GIT_REF stattdessen auf einen Tag oder Commit-SHA festsetzen.
 GIT_REF="develop"
 APP_DIR="/opt/medidoc"
 COMPOSE_VERSION="v5.1.2"

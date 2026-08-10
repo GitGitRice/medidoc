@@ -180,6 +180,10 @@ User Data ausgeführt. Das Skript:
 6. bindet beide Datenbankports nur an die lokale Schnittstelle,
 7. startet alle Services und legt 25 erfundene Testpatienten an.
 
+`develop` ist hier bewusst ein beweglicher Stand, damit die Demo über den unten
+beschriebenen Betriebsablauf aktualisiert werden kann. Für ein unveränderliches
+Release muss `GIT_REF` im Bootstrap auf einen Tag oder Commit-SHA zeigen.
+
 Der Bootstrap ist ausschließlich für die Ersteinrichtung gedacht. Existiert bereits
 `/opt/medidoc/.env`, bricht er ab, bevor Repository oder Zugangsdaten überschrieben
 werden. Aktualisierungen erfolgen stattdessen mit den Befehlen im nächsten Abschnitt.
