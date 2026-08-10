@@ -1,4 +1,5 @@
 import DocumentList from '../components/DocumentList';
+import { CreateDocumentCard } from '../components/CreateDocumentCard';
 import PatientDetail from '../components/PatientDetail';
 
 import '../css/PatientDetailPage.css';
@@ -78,6 +79,17 @@ export function PatientDetailPage() {
     }
   }
 
+  async function handleCreateDocument(formData) {
+    const createdDocument = await apiFetch(`/docs/${patientId}`, {
+      method: "POST",
+      body: formData,
+    });
+
+    // Die API liefert das neu angelegte Dokument vollständig zurück. Da die
+    // Liste nach Erstellungszeit absteigend sortiert ist, kommt es nach oben.
+    setDocuments((currentDocuments) => [createdDocument, ...currentDocuments]);
+  }
+
   async function handleUpdateDocument(id, patientId, changeDocument) {
 
     const currentDocument = documents.find(document => document.id === id);
@@ -86,10 +98,9 @@ export function PatientDetailPage() {
     try {
       
       const updatedDocument = {
-        id,
-        patientId, 
+        ...currentDocument,
+        patient_id: patientId,
         ...changeDocument,
-        tags: changeDocument.tags?.join(", ") ?? "",
       };
           
       setDocuments(prevDocuments =>
@@ -184,6 +195,7 @@ export function PatientDetailPage() {
                   onChange={(e) => setSearchTextDocuments(e.target.value)}
                 />
             </div>
+            <CreateDocumentCard onCreate={handleCreateDocument} />
             {/* NEU: Loading-Anzeige waehrend die Dokumente geladen werden */}           
             {loading ? (
                 <p style={{ textAlign: "center", color: "#888", padding: "40px" }}>
