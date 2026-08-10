@@ -7,6 +7,7 @@ import {
   getCurrentUser,
   jsonBody,
   login,
+  patientPath,
   patientsPath,
   userPath,
   usersPath,
@@ -80,6 +81,10 @@ describe("patientsPath", () => {
       "/patients?limit=25&offset=0",
     );
   });
+
+  it("zeigt auf einen einzelnen Patienten", () => {
+    expect(patientPath(42)).toBe("/patients/42");
+  });
 });
 
 describe("usersPath", () => {
@@ -137,6 +142,33 @@ describe("Fehlermeldungen", () => {
       message: "E-Mail oder Passwort ist falsch",
       status: 401,
     });
+  });
+
+  it("übernimmt `errors` aus einer 422-Antwort", async () => {
+    stubFetch(
+      {
+        status: 422,
+        message: "Pflichtfelder fehlen: last_name",
+        errors: [{ field: "last_name", message: "Feld ist erforderlich" }],
+      },
+      { status: 422 },
+    );
+
+    const error = await login("a@b.test", "falsch").catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      status: 422,
+      message: "Pflichtfelder fehlen: last_name",
+      errors: [{ field: "last_name", message: "Feld ist erforderlich" }],
+    });
+  });
+
+  it("lässt `errors` `null`, wenn die Antwort keine Feldfehler mitbringt", async () => {
+    stubFetch({ status: 401, message: "Anmeldung erforderlich" }, { status: 401 });
+
+    const error = await login("a@b.test", "falsch").catch((caught) => caught);
+
+    expect(error.errors).toBeNull();
   });
 
   it("zeigt bei einem FastAPI-Validierungsfehler keinen Objekt-Müll", async () => {
