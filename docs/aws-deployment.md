@@ -244,8 +244,9 @@ als `Delete on termination` konfigurierte Root-Volume endgültig.
 
 ## Grenzen des Demo-Deployments
 
-Das Deployment arbeitet bewusst mit HTTP, dem Vite-Entwicklungsserver und
-ausschließlich erfundenen Testdaten. Es ist ein überprüfbarer Projekt- und
-Schulungsstand, aber keine geeignete Produktionsumgebung für echte Patientendaten.
-Für Produktion wären unter anderem HTTPS, eine feste Domain, Backups, getrennte
-Netze und ein eigener Umgang mit Secrets erforderlich.
+Das Deployment arbeitet bewusst mit HTTP, dem Vite-Entwicklungsserver, FastAPI mit
+automatischem Reload über einen Bind-Mount und ausschließlich erfundenen Testdaten.
+Es ist ein überprüfbarer Projekt- und Schulungsstand, aber keine geeignete
+Produktionsumgebung für echte Patientendaten. Für Produktion wären unter anderem
+HTTPS, eine feste Domain, Backups, getrennte Netze und ein eigener Umgang mit Secrets
+erforderlich.
