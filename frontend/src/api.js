@@ -12,10 +12,14 @@ const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replac
 );
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, errors = null) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    // Ein Eintrag pro beanstandetem Feld bei `422` (app/core/errors.py),
+    // sonst `null` — Formulare koennen so gezielt an einzelnen Feldern
+    // eine Meldung zeigen, statt nur den zusammengefassten Text.
+    this.errors = errors;
   }
 }
 
@@ -74,6 +78,21 @@ function errorMessage(body, status) {
 }
 
 /**
+ * Die feldbezogenen Meldungen aus einer `422`-Antwort, oder `null`.
+ *
+ * `errors` kommt nur bei `422` und nur von unserem eigenen Handler
+ * (app/core/errors.py) — ein Eintrag pro beanstandetem Feld mit `field` und
+ * `message`.
+ */
+function fieldErrors(body) {
+  if (typeof body === "object" && Array.isArray(body?.errors)) {
+    return body.errors;
+  }
+
+  return null;
+}
+
+/**
  * Ein Request gegen die API. `token` wird, wenn gesetzt, als Bearer-Header
  * mitgeschickt — damit kein Aufrufer den Header selbst zusammenbaut.
  */
@@ -100,7 +119,11 @@ export async function apiRequest(path, { token, headers, ...options } = {}) {
   const body = await readResponse(response);
 
   if (!response.ok) {
-    throw new ApiError(errorMessage(body, response.status), response.status);
+    throw new ApiError(
+      errorMessage(body, response.status),
+      response.status,
+      fieldErrors(body),
+    );
   }
 
   return body;
@@ -163,6 +186,14 @@ export function patientPath(patientId) {
  */
 export function documentsPath(patientId, { q, limit, offset } = {}) {
   return withQuery(`/docs/${patientId}`, { q, limit, offset });
+}
+
+/**
+ * Der Pfad für einen einzelnen Patienten — `GET`, `PATCH` und `DELETE
+ * /patients/{id}` teilen sich diese Adresse.
+ */
+export function patientPath(id) {
+  return `/patients/${id}`;
 }
 
 /**

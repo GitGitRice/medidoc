@@ -3,16 +3,18 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
+import Snackbar from "@mui/material/Snackbar";
 import Typography from "@mui/material/Typography";
 
-import { patientsPath } from "../api.js";
+import { jsonBody, patientPath, patientsPath } from "../api.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
-import { PatientSearch } from "../components/PatientSearch.jsx";
+import { PatientFormDialog } from "../components/PatientFormDialog.jsx";
 import { PatientTable } from "../components/PatientTable.jsx";
+import { PatientToolbar } from "../components/PatientToolbar.jsx";
 
 export function Overview() {
-  const { apiFetch } = useAuth();
+  const { apiFetch, hasRole } = useAuth();
 
   const [patients, setPatients] = useState(null);
   const [total, setTotal] = useState(0);
@@ -20,6 +22,23 @@ export function Overview() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [q, setQ] = useState("");
   const [error, setError] = useState(null);
+
+  // Zaehler statt boolean: jede erfolgreiche Aenderung soll die Liste neu
+  // holen, auch wenn Seite, Seitengroesse und Suche unveraendert sind.
+  const [reloadCount, setReloadCount] = useState(0);
+  const [successMessage, setSuccessMessage] = useState(null);
+
+  // Die Tabellenzeile kennt nur `PatientListItem` (id, Name, Geburtsdatum,
+  // Versichertennummer) — fuers Bearbeiten fehlen Kontakt-, Adress- und
+  // Versicherungsfelder. `editingPatientId` oeffnet den Dialog sofort mit
+  // Ladeanzeige, `editPatient` traegt die volle `PatientPublic`-Antwort nach.
+  const [editingPatientId, setEditingPatientId] = useState(null);
+  const [editPatient, setEditPatient] = useState(null);
+  const [isLoadingEditPatient, setIsLoadingEditPatient] = useState(false);
+  const [editLoadError, setEditLoadError] = useState(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -40,7 +59,79 @@ export function Overview() {
       });
 
     return () => controller.abort();
-  }, [apiFetch, q, page, rowsPerPage]);
+  }, [apiFetch, q, page, rowsPerPage, reloadCount]);
+
+  useEffect(() => {
+    if (editingPatientId === null) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+
+    setIsLoadingEditPatient(true);
+    apiFetch(patientPath(editingPatientId), { signal: controller.signal })
+      .then((patient) => {
+        setEditPatient(patient);
+        setIsLoadingEditPatient(false);
+      })
+      .catch((loadError) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setEditLoadError(loadError.message || "Patient konnte nicht geladen werden.");
+        setIsLoadingEditPatient(false);
+      });
+
+    return () => controller.abort();
+  }, [apiFetch, editingPatientId]);
+
+  function openEditDialog(patient) {
+    setEditPatient(null);
+    setEditLoadError(null);
+    setSaveError(null);
+    setEditingPatientId(patient.id);
+  }
+
+  function openCreateDialog() {
+    setSaveError(null);
+    setIsCreateDialogOpen(true);
+  }
+
+  function closeFormDialog() {
+    if (isSaving) {
+      return;
+    }
+    setEditingPatientId(null);
+    setEditPatient(null);
+    setEditLoadError(null);
+    setIsCreateDialogOpen(false);
+    setSaveError(null);
+  }
+
+  async function savePatient(payload) {
+    if (isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      if (editingPatientId !== null) {
+        await apiFetch(patientPath(editingPatientId), jsonBody("PATCH", payload));
+        setSuccessMessage("Patient wurde erfolgreich aktualisiert.");
+      } else {
+        await apiFetch(patientsPath(), jsonBody("POST", payload));
+        setSuccessMessage("Patient wurde erfolgreich angelegt.");
+      }
+      closeFormDialog();
+      setReloadCount((count) => count + 1);
+    } catch (saveRequestError) {
+      setSaveError(saveRequestError);
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   function handlePageChange(_event, newPage) {
     setPage(newPage);
@@ -62,11 +153,6 @@ export function Overview() {
 
   return (
     <Box>
-      {/* Ohne Aktion: "Neuer Patient" ist bewusst nicht gerendert, weil es
-          weder eine Route (/patients/new) noch einen api.js-Aufruf dafuer
-          gibt. Der Weg zur Benutzerverwaltung (#54) steht jetzt in der
-          Navigation in `Layout.jsx` — er fuehrt woanders hin und ist damit
-          keine Aktion auf dieser Liste. */}
       <PageHeader
         title="Patientenübersicht"
         count={
@@ -76,9 +162,11 @@ export function Overview() {
         }
       />
 
-      <Box sx={{ marginBlockEnd: 2 }}>
-        <PatientSearch onSearch={handleSearch} />
-      </Box>
+      <PatientToolbar
+        onSearch={handleSearch}
+        onCreateClick={openCreateDialog}
+        canCreate={hasRole("admin", "staff")}
+      />
 
       {error && <Alert severity="error">{error.message}</Alert>}
 
@@ -118,8 +206,31 @@ export function Overview() {
           rowsPerPage={rowsPerPage}
           onPageChange={handlePageChange}
           onRowsPerPageChange={handleRowsPerPageChange}
+          onEditClick={openEditDialog}
         />
       )}
+
+      <PatientFormDialog
+        open={editingPatientId !== null || isCreateDialogOpen}
+        mode={editingPatientId !== null ? "edit" : "create"}
+        patient={editPatient}
+        isLoading={isLoadingEditPatient}
+        loadError={editLoadError}
+        isSaving={isSaving}
+        error={saveError}
+        onCancel={closeFormDialog}
+        onSave={savePatient}
+      />
+
+      <Snackbar
+        open={successMessage !== null}
+        autoHideDuration={4000}
+        onClose={() => setSuccessMessage(null)}
+      >
+        <Alert severity="success" onClose={() => setSuccessMessage(null)}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
