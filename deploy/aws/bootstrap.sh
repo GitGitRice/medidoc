@@ -24,7 +24,6 @@ fi
 dnf update -y
 dnf install -y docker git
 systemctl enable --now docker
-usermod -aG docker ec2-user
 
 if ! docker compose version >/dev/null 2>&1; then
   install -d -m 0755 /usr/local/lib/docker/cli-plugins
