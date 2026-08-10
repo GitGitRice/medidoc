@@ -1,214 +1,194 @@
-import DocumentList from '../components/DocumentList';
-import PatientDetail from '../components/PatientDetail';
-
-import '../css/PatientDetailPage.css';
-
-import { useEffect, useState } from 'react';
-
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import patientsAll from "../data/patients.json";
-import documentsAll from "../data/documents.json";
+import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
 
+import { documentsPath, patientPath } from "../api.js";
+import { useAuth } from "../auth/AuthContext.jsx";
+import DocumentList from "../components/DocumentList";
+import PatientDetail from "../components/PatientDetail";
 
+import "../css/PatientDetailPage.css";
+
+/**
+ * Die Akte eines Patienten: Stammdaten links, Dokumente rechts.
+ *
+ * Beides kommt aus der API — die Stammdaten aus `GET /patients/{id}`
+ * (docs/patients-api.md), die Dokumente aus `GET /docs/{patient_id}`
+ * (docs/documents-api.md). Der Weg dahin führt über `apiFetch` aus dem
+ * `AuthContext`: Dort hängt der Token dran, und ein `401` meldet ab.
+ *
+ * Gesucht wird **im Browser**, nicht über `q`. Das Feld filtert nach Titel,
+ * Tags und Dokumenttyp; `q` durchsucht dagegen Titel und Beschreibung
+ * (docs/documents-api.md). Ein Umstieg auf die Suche des Backends würde die
+ * Suche nach einem Tag also stillschweigend abschalten. Die Liste ist
+ * vollständig geladen — ein Patient hat ein paar Dutzend Dokumente, keine
+ * Tausend.
+ */
 export function PatientDetailPage() {
-
   const { patientId } = useParams();
+  const { apiFetch } = useAuth();
 
+  // `null` heißt "noch nicht geladen" und ist damit etwas anderes als die
+  // leere Liste: Ein Patient ohne Dokumente ist ein gültiger Zustand, kein
+  // Ladezustand.
   const [patient, setPatient] = useState(null);
-  const [documents, setDocuments] = useState([]);
-
-  const [searchTextDocuments, setSearchTextDocuments] = useState("");
-  const [searchTagDocuments, setSearchTagDocuments] = useState("");
-  const [searchTypeDocuments, setSearchTypeDocuments] = useState("");
-  const [selectedDocument, setSelectedDocument] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-  
-  // NEU: Loading-State um dem User Feedback zu geben
-  const [loading, setLoading] = useState(true);
-
-  // NEU: Error-State um Fehler anzuzeigen
+  const [documents, setDocuments] = useState(null);
   const [error, setError] = useState(null);
 
-  console.log("PatientId:   ", patientId );
+  const [searchTextDocuments, setSearchTextDocuments] = useState("");
+  const [editingId, setEditingId] = useState(null);
 
-  async function getPatient(patientId) {
-    return patientsAll.find((p) => p.id === Number(patientId));
+  useEffect(() => {
+    const controller = new AbortController();
+
+    // Zurück auf Anfang: Ohne das stünden beim Wechsel auf den nächsten
+    // Patienten kurz dessen Name über den Dokumenten des vorigen.
+    setPatient(null);
+    setDocuments(null);
+    setError(null);
+
+    Promise.all([
+      apiFetch(patientPath(patientId), { signal: controller.signal }),
+      apiFetch(documentsPath(patientId), { signal: controller.signal }),
+    ])
+      .then(([loadedPatient, documentPage]) => {
+        setPatient(loadedPatient);
+        setDocuments(documentPage.items);
+      })
+      .catch((loadError) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setError(loadError);
+      });
+
+    // `patientId` steht in den Abhängigkeiten: Der Wechsel von einer
+    // Detailseite zur nächsten tauscht nur den Parameter aus, die Komponente
+    // bleibt stehen. Ohne ihn bliebe der erste Patient stehen.
+    return () => controller.abort();
+  }, [apiFetch, patientId]);
+
+  /**
+   * Entfernt ein Dokument aus der Liste.
+   *
+   * Noch **ohne** `DELETE /docs/{patient_id}/{document_id}` — das Löschen
+   * wirklich wirken zu lassen ist Issue #78. Bis dahin ist es nur die Anzeige,
+   * und ein Neuladen bringt das Dokument zurück.
+   */
+  function handleDeleteDocument(id) {
+    setDocuments((current) => current.filter((document) => document.id !== id));
   }
 
-  async function getDocuments(patientId) {
-    return documentsAll.filter((d) => d.patient_id === Number(patientId));
+  /** Wie beim Löschen: bis auf Weiteres nur in der Anzeige (Issue #78). */
+  function handleUpdateDocument(id, _patientId, changes) {
+    setDocuments((current) =>
+      current.map((document) =>
+        document.id === id ? { ...document, ...changes } : document,
+      ),
+    );
+    setEditingId(null);
   }
 
-  async function loadPatientWithDocuments(patientId) {
-    try {
-      setLoading(true);
-      setError(null);
-      const patientData = await getPatient(patientId);
-
-      if (!patientData || !patientData.id) {
-        throw new Error("Patient nicht gefunden");
-      }
-      
-      console.log("Loading Patient: ", patientData)
-      
-      setPatient(patientData);
-      
-      const doccumentsData = await getDocuments(patientId);
-      console.log("Loading Documents: ", doccumentsData)
-      
-      setDocuments(doccumentsData);
-    
-    } catch (err) {
-      console.error("Fehler beim Laden:", err);
-      setError("Patient und/oder Dokumente konnten nicht geladen werden. Läuft das Backend?");
-    } finally {
-      setLoading(false);
-    }
+  function handleStartEdit(id) {
+    setEditingId(id);
   }
 
-  async function handleDeleteDocument(id) {
-    try {
-      // API-Call: DELETE
-      // await deleteDocument(id);    
-      setDocuments(prevDocuments => prevDocuments.filter(document => document.id !== id));
-    } catch (err) {
-      console.error("Fehler beim Löschen:", err);
-      setError("Dokument konnte nicht geloescht werden.");
-    }
+  function handleCancelEdit() {
+    setEditingId(null);
   }
 
-  async function handleUpdateDocument(id, patientId, changeDocument) {
-
-    const currentDocument = documents.find(document => document.id === id);
-    if (!currentDocument) return;
-
-    try {
-      
-      const updatedDocument = {
-        id,
-        patientId, 
-        ...changeDocument,
-        tags: changeDocument.tags?.join(", ") ?? "",
-      };
-          
-      setDocuments(prevDocuments =>
-        prevDocuments.map(document => document.id === id ? updatedDocument : document)
-      );
-      handleCancelEdit();
-    } catch (err) {
-      console.error("Fehler beim Aktualisieren:", err);
-      setError("Dokument konnte nicht geaendert werden.");
-    }
+  if (error) {
+    return (
+      <Box>
+        {/* Der Satz kommt aus der Antwort (`ApiError.message`) und nicht aus
+            dieser Seite — sonst hiesse "gibt es nicht" hier anders als im
+            Backend. Nur die Überschrift steht fest, weil `404` immer
+            dieselbe Auskunft ist. */}
+        {error.status === 404 ? (
+          <Paper variant="outlined" sx={{ padding: 4, textAlign: "center" }}>
+            <Typography variant="h6" component="p">
+              Patient nicht gefunden
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {error.message}
+            </Typography>
+          </Paper>
+        ) : (
+          <Alert severity="error">{error.message}</Alert>
+        )}
+      </Box>
+    );
   }
 
-   function handleStartEdit(id) {
-      setEditingId(id);
-    }
+  if (patient === null || documents === null) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", paddingBlock: 6 }}>
+        <CircularProgress aria-label="Patientenakte wird geladen" />
+      </Box>
+    );
+  }
 
-    function handleCancelEdit() {
-      setEditingId(null);
-    }
+  const filteredDocuments = documents.filter((document) =>
+    matchesSearch(document, searchTextDocuments),
+  );
 
-    useEffect(() => {
-      loadPatientWithDocuments(patientId) 
-    }, []);
+  return (
+    <div className="app-main">
+      <aside className="app-sidebar">
+        <PatientDetail patient={patient} />
+      </aside>
 
-  
-    const filteredDocuments = documents.filter( document => {
+      <section className="app-content">
+        <div className="search-box">
+          <span className="search-icon">⌕</span>
 
-    const searchTextLowerCase = searchTextDocuments.trim().toLowerCase();
-    if(searchTextLowerCase === "") {
-      return true; 
-    }
+          <input
+            type="text"
+            placeholder="Suche in Titel, Tags und Dokumenttyp"
+            className="search-input"
+            aria-label="Suche in Titel, Tags und Dokumenttyp"
+            value={searchTextDocuments}
+            onChange={(event) => setSearchTextDocuments(event.target.value)}
+          />
+        </div>
 
-    let textMatch = true;
-      
-    if (searchTextLowerCase.length > 0) {
-        const titleMatchBySearchText = document.title.trim().toLowerCase().includes(searchTextLowerCase);
-        const tagMatchBySearchText = document.tags === null ? 
-                  false : document.tags.join(', ').toLowerCase().includes(searchTextLowerCase);
-        const typeMatchBySearchText = document.document_type === null ? 
-                  false : document.document_type.toLowerCase().includes(searchTextLowerCase);         
-          textMatch = titleMatchBySearchText 
-                    || tagMatchBySearchText
-                    || typeMatchBySearchText;
-    }
+        <DocumentList
+          documents={filteredDocuments}
+          searchTextDocuments={searchTextDocuments}
+          editingId={editingId}
+          onDelete={handleDeleteDocument}
+          onStartEdit={handleStartEdit}
+          onCancelEdit={handleCancelEdit}
+          onUpdateDocument={handleUpdateDocument}
+        />
+      </section>
+    </div>
+  );
+}
 
-      return textMatch;
-    })
-    if (error) 
-      return (  
-      <div className="app-main">
-           {error && (
-              <div style={{
-                gridColumn : "1 / -1",
-                padding: "12px 16px",
-                marginBottom: "16px",
-                backgroundColor: "#fee",
-                color: "#c00",
-                borderRadius: "6px",
-                border: "1px solid #fcc"
-              }}>
-                {error}
-                <button
-                  onClick={() => setError(null)}
-                  style={{
-                    marginLeft: "12px",
-                    background: "none",
-                    border: "none",
-                    color: "#c00",
-                    cursor: "pointer",
-                    fontWeight: "bold"
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-            )}  
-      </div> )
-  return (        
-            <div className="app-main">
-             <aside className="app-sidebar">
-              {loading ? (
-                <p style={{ textAlign: "center", color: "#888", padding: "40px" }}>
-                  Lade Patient...
-                </p>
-              ) : (
-                <PatientDetail patient = {patient} />
-              )}
-              </aside>
-            <section className="app-content">
-             
-            <div className="search-box">
-                <span className="search-icon">⌕</span>
+/**
+ * Trifft der Suchtext auf Titel, Tags oder Dokumenttyp?
+ *
+ * Ein leerer Text trifft alles — "keine Suche" ist kein Filter. `description`
+ * bleibt bewusst draußen: Das Feld steht so im Suchfeld, und ein Treffer, den
+ * niemand in der Karte sieht, sähe nach einem Fehler aus.
+ */
+function matchesSearch(document, searchText) {
+  const term = searchText.trim().toLowerCase();
+  if (term === "") {
+    return true;
+  }
 
-                <input
-                  type="text"
-                  placeholder="Suche in Titel, Tags und Dokumenttyp"
-                  className="search-input"
-                  value={searchTextDocuments}
-                  onChange={(e) => setSearchTextDocuments(e.target.value)}
-                />
-            </div>
-            {/* NEU: Loading-Anzeige waehrend die Dokumente geladen werden */}           
-            {loading ? (
-                <p style={{ textAlign: "center", color: "#888", padding: "40px" }}>
-                  Lade Dokumente...
-                </p>
-              ) : (
-              <DocumentList
-                documents = {filteredDocuments}
-                searchTextDocuments={searchTextDocuments}
-                error={error}
-                editingId={editingId}
-                onDelete={handleDeleteDocument}
-                onStartEdit={handleStartEdit}
-                onCancelEdit={handleCancelEdit}
-                onUpdateDocument={handleUpdateDocument}
-              />
-              )}
-        </section>
-      </div>        
-      )
-    }
+  const haystack = [
+    document.title,
+    document.document_type,
+    ...(document.tags ?? []),
+  ];
+
+  return haystack.some((value) => (value ?? "").toLowerCase().includes(term));
+}

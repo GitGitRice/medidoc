@@ -35,8 +35,8 @@ docker compose up
 
 API auf <http://localhost:8000>, interaktive Doku auf <http://localhost:8000/docs>.
 
-Testdaten anlegen — 2 Benutzer und 200 Patienten, mehrfach ausführbar, Vorhandenes wird
-übersprungen:
+Testdaten anlegen — 2 Benutzer, 200 Patienten und 17 Dokumente in den Akten der ersten
+sechs, mehrfach ausführbar, Vorhandenes wird übersprungen:
 
 ```bash
 docker compose exec fastapi python -m app.seed
@@ -47,6 +47,11 @@ Weniger Patienten, wenn es nur ums Ausprobieren geht:
 ```bash
 docker compose exec fastapi python -m app.seed --patients 50
 ```
+
+Die Dokumente brauchen MongoDB (ADR-0002). Ohne `MONGO_URL` werden sie übersprungen, der
+Rest läuft; wer sie gar nicht will, hängt `--no-documents` an. Die Anhänge in den
+Testdaten sind Platzhalter: Name, Typ und Größe stimmen, die Bytes sind ein kurzer Text —
+ausgeliefert werden sie ohnehin nicht, einen Download-Endpunkt gibt es noch nicht.
 
 Bei Modelländerungen zieht `create_all` geänderte Spalten **nicht** nach. Tabellen
 wegwerfen und neu seeden:
@@ -79,6 +84,7 @@ beim Import, auch im Test.
 | [tests/test_patients_api.py](tests/test_patients_api.py) | Patienten-Endpunkte, gegliedert nach Endpunkt |
 | [tests/test_audit.py](tests/test_audit.py) | Audit-Trail, Datensparsamkeit, Missbrauchserkennung, Monitoring |
 | [tests/test_documents_api.py](tests/test_documents_api.py) | Dokumente je Patient, Dokumenttyp, Anhang (auch ohne), 20-MB-Grenze, Ablage |
+| [tests/test_documents_seed.py](tests/test_documents_seed.py) | Testdokumente: gültig, alle vier Dokumenttypen, mehrfach ausführbar |
 
 Was sich gegen SQLite **nicht** prüfen lässt, steht als Kommentar im jeweiligen Testkopf.
 Der wichtigste Fall: SQLite ignoriert die Groß-/Kleinschreibung nur bei ASCII-Zeichen, die
@@ -96,7 +102,8 @@ backend/
 ├── pytest.ini
 ├── tests/               laufen gegen SQLite im Speicher, ohne Docker
 ├── testdata/
-│   └── patients.json    200 erfundene Patienten
+│   ├── patients.json    200 erfundene Patienten
+│   └── documents.json   17 Dokumente in den Akten der ersten sechs
 └── app/
     ├── main.py          App, CORS, /health — sonst nichts
     ├── seed.py          Einstiegspunkt Testdaten: ruft die Seeds der Module

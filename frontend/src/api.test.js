@@ -3,10 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   apiRequest,
+  documentsPath,
   FORBIDDEN_ERROR,
   getCurrentUser,
   jsonBody,
   login,
+  patientPath,
   patientsPath,
   userPath,
   usersPath,
@@ -79,6 +81,28 @@ describe("patientsPath", () => {
     expect(patientsPath({ q: "", limit: 25, offset: 0 })).toBe(
       "/patients?limit=25&offset=0",
     );
+  });
+});
+
+describe("patientPath", () => {
+  it("zeigt auf einen einzelnen Patienten", () => {
+    expect(patientPath(42)).toBe("/patients/42");
+  });
+});
+
+describe("documentsPath", () => {
+  it("zeigt ohne Parameter auf die Dokumente eines Patienten", () => {
+    expect(documentsPath(42)).toBe("/docs/42");
+  });
+
+  it("hängt Suche, Seitengröße und Offset als Query an", () => {
+    expect(documentsPath(42, { q: "mrt", limit: 100, offset: 0 })).toBe(
+      "/docs/42?q=mrt&limit=100&offset=0",
+    );
+  });
+
+  it("lässt q bei leerer Suche weg", () => {
+    expect(documentsPath(42, { q: "", limit: 100 })).toBe("/docs/42?limit=100");
   });
 });
 

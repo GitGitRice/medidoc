@@ -118,9 +118,20 @@ export function getCurrentUser(token, options = {}) {
   return apiRequest("/auth/me", { ...options, token });
 }
 
-/** Hängt `limit` und `offset` an einen Pfad, soweit gesetzt. */
-function withPaging(path, { limit, offset } = {}) {
+/**
+ * Hängt Suche und Seitengröße an einen Pfad, soweit gesetzt.
+ *
+ * Eine Stelle für alle Listen: `q`, `limit` und `offset` heißen bei Patienten,
+ * Benutzern und Dokumenten gleich (docs/patients-api.md,
+ * docs/documents-api.md). Eine leere Suche wird weggelassen und nicht als
+ * `q=` geschickt — das Backend liest beides gleich, in der Adresszeile steht
+ * sonst ein Filter, der keiner ist.
+ */
+function withQuery(path, { q, limit, offset } = {}) {
   const params = new URLSearchParams();
+  if (q) {
+    params.set("q", q);
+  }
   if (limit != null) {
     params.set("limit", limit);
   }
@@ -136,19 +147,22 @@ function withPaging(path, { limit, offset } = {}) {
  * Der Pfad für `GET /patients`, mit Suche und Seitengröße.
  */
 export function patientsPath({ q, limit, offset } = {}) {
-  const params = new URLSearchParams();
-  if (q) {
-    params.set("q", q);
-  }
-  if (limit != null) {
-    params.set("limit", limit);
-  }
-  if (offset != null) {
-    params.set("offset", offset);
-  }
+  return withQuery("/patients", { q, limit, offset });
+}
 
-  const query = params.toString();
-  return query ? `/patients?${query}` : "/patients";
+/** Der Pfad für `GET /patients/{id}` — ein einzelner Patient mit allen Feldern. */
+export function patientPath(patientId) {
+  return `/patients/${patientId}`;
+}
+
+/**
+ * Der Pfad für `GET /docs/{patient_id}` — die Dokumente eines Patienten.
+ *
+ * `q` filtert nach **Titel und Beschreibung**, nicht nach Tags oder
+ * Dokumenttyp (docs/documents-api.md).
+ */
+export function documentsPath(patientId, { q, limit, offset } = {}) {
+  return withQuery(`/docs/${patientId}`, { q, limit, offset });
 }
 
 /**
@@ -158,7 +172,7 @@ export function patientsPath({ q, limit, offset } = {}) {
  * `is_active`.
  */
 export function usersPath({ limit, offset } = {}) {
-  return withPaging("/users", { limit, offset });
+  return withQuery("/users", { limit, offset });
 }
 
 /** Der Pfad für `PATCH /users/{id}`. */
