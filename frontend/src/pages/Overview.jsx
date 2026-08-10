@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
 import Snackbar from "@mui/material/Snackbar";
@@ -11,8 +10,8 @@ import { jsonBody, patientPath, patientsPath } from "../api.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
 import { PatientFormDialog } from "../components/PatientFormDialog.jsx";
-import { PatientSearch } from "../components/PatientSearch.jsx";
 import { PatientTable } from "../components/PatientTable.jsx";
+import { PatientToolbar } from "../components/PatientToolbar.jsx";
 
 export function Overview() {
   const { apiFetch, hasRole } = useAuth();
@@ -161,18 +160,13 @@ export function Overview() {
             ? `${total} ${total === 1 ? "Patient" : "Patienten"}`
             : null
         }
-        action={
-          hasRole("admin", "staff") && (
-            <Button variant="contained" onClick={openCreateDialog}>
-              Neuer Patient
-            </Button>
-          )
-        }
       />
 
-      <Box sx={{ marginBlockEnd: 2 }}>
-        <PatientSearch onSearch={handleSearch} />
-      </Box>
+      <PatientToolbar
+        onSearch={handleSearch}
+        onCreateClick={openCreateDialog}
+        canCreate={hasRole("admin", "staff")}
+      />
 
       {error && <Alert severity="error">{error.message}</Alert>}
 
