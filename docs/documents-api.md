@@ -415,3 +415,15 @@ Anhang, die Größenprüfung und die Ablage auf der Platte. Sie laufen gegen den
 Speicher-Store und einen temporären Ordner — kein MongoDB, kein Docker.
 
 Der wichtigste Test ist `test_der_dateiname_des_aufrufers_wird_nie_zum_pfad`.
+
+## Testdaten
+
+[`backend/testdata/documents.json`](../backend/testdata/documents.json) füllt die Akten der
+ersten sechs Testpatienten — alle vier üblichen Dokumenttypen, mit und ohne Anhang, eines
+nur mit Pflichtangaben. Angelegt werden sie mit `python -m app.seed`
+([backend/README.md](../backend/README.md)); der Patient steht dort als Versichertennummer
+und nicht als `id`, weil die `id` davon abhängt, was vorher in der Tabelle stand.
+
+Die Anhänge sind **Platzhalter**: Name, Typ und Größe stimmen, die Bytes sind ein kurzer
+Text. Ausgeliefert werden sie ohnehin nicht — einen Download gibt es noch nicht (siehe
+[Offene Punkte](#offene-punkte)).
