@@ -12,6 +12,8 @@ GIT_REF="develop"
 APP_DIR="/opt/medidoc"
 COMPOSE_VERSION="v5.1.2"
 BUILDX_VERSION="v0.17.1"
+POSTGRES_DB="medidoc"
+POSTGRES_USER="medidoc"
 
 echo "MediDoc bootstrap started"
 
@@ -73,8 +75,8 @@ STAFF_PASSWORD="$(openssl rand -hex 12)"
 
 umask 077
 cat > .env <<EOF
-POSTGRES_DB=medidoc
-POSTGRES_USER=medidoc
+POSTGRES_DB=${POSTGRES_DB}
+POSTGRES_USER=${POSTGRES_USER}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_PORT=5432
 DB_BIND_IP=127.0.0.1
@@ -114,7 +116,8 @@ chmod 0600 /home/ec2-user/medidoc-demo-login.txt
 docker compose up -d --build
 
 for attempt in {1..30}; do
-  if docker compose exec -T postgres pg_isready -U medidoc -d medidoc; then
+  if docker compose exec -T postgres \
+    pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"; then
     break
   fi
   if [[ "${attempt}" -eq 30 ]]; then
