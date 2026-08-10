@@ -18,6 +18,9 @@ def patient_routes() -> list[tuple[str, str]]:
     Bewusst aus der App gelesen statt von Hand gepflegt: Ein neuer Endpunkt
     landet damit automatisch im Test unten und muss sich absichern.
 
+    Seit die Dokumente unter `/patients/{id}/documents` hängen, sind sie hier
+    mit drin — dieselbe Absicherung ohne eine einzige Zeile mehr.
+
     Quelle ist das OpenAPI-Schema und nicht `app.routes` — eingebundene Router
     hängen dort inzwischen hinter einem Wrapper, `app.routes` wäre also still
     leer und der Test würde zu einem übersprungenen Testfall verpuffen.
@@ -121,7 +124,8 @@ def test_die_routenliste_ist_nicht_leer():
     übersprungener Testfall — die Absicherung wäre dann ungeprüft, ohne dass
     der Lauf rot wird. Genau das ist beim Schreiben einmal passiert.
     """
-    assert len(patient_routes()) == 5
+    # 5 Patienten-Routen + 4 für die Dokumente darunter.
+    assert len(patient_routes()) == 9
 
 
 @pytest.mark.parametrize(("method", "path"), patient_routes())
@@ -135,7 +139,12 @@ def test_alle_patienten_endpunkte_verlangen_einen_token(
     ohne Body raus: Die Token-Prüfung läuft vor der Body-Validierung, `401`
     muss also auch ohne gültige Nutzdaten kommen.
     """
-    response = client.request(method, path.replace("{patient_id}", "1"))
+    url = (
+        path.replace("{patient_id}", "1")
+        .replace("{document_id}", "egal")
+        .replace("{attachment_id}", "egal")
+    )
+    response = client.request(method, url)
 
     assert response.status_code == 401
 

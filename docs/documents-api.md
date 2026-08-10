@@ -13,16 +13,18 @@ Basis-URL lokal: `http://localhost:8000`
 ## Kurzfassung
 
 - **Jeder Endpunkt verlangt einen gültigen Token.** `DELETE` verlangt zusätzlich `admin`.
-- Angelegt wird **multipart**, nicht JSON — anders reist ein Anhang nicht.
-- **Der Anhang ist optional.** Ein Dokument ohne Anhang ist gültig.
-- **Höchstens 20 MB** je Anhang. Darüber `413`, geprüft beim Schreiben.
+- Angelegt wird **multipart**, nicht JSON — anders reisen Anhänge nicht.
+- **Anhänge sind optional und dürfen mehrere sein.** Ein Befund aus drei gescannten Seiten
+  ist **ein** Dokument mit drei Anhängen.
+- **Höchstens 20 MB** je Anhang, höchstens 20 Anhänge. Darüber `413` bzw. `422`.
 - Ein Dokument gehört immer zu genau einem Patienten. Gibt es den nicht, kommt `404`.
 
 | Methode | Pfad | Zweck | Erfolg | Verlangt |
 | ------- | ---- | ----- | ------ | -------- |
-| `POST` | `/docs/{patient_id}` | Dokument anlegen | `201` | Token |
-| `GET` | `/docs/{patient_id}?q=&limit=&offset=` | Dokumente auflisten | `200` | Token |
-| `DELETE` | `/docs/{patient_id}/{document_id}` | Dokument löschen | `204` | Token + `admin` |
+| `POST` | `/patients/{patient_id}/documents` | Dokument anlegen | `201` | Token |
+| `GET` | `/patients/{patient_id}/documents?q=&limit=&offset=` | Dokumente auflisten | `200` | Token |
+| `GET` | `…/documents/{document_id}/attachments/{attachment_id}` | Anhang abrufen | `200` | Token |
+| `DELETE` | `…/documents/{document_id}` | Dokument löschen | `204` | Token + `admin` |
 
 ## Namensgebung
 
@@ -35,13 +37,13 @@ Für die Fachbegriffe gilt [CONTEXT.md](../CONTEXT.md), und zwar wörtlich. Die 
 
 | Begriff | Was gemeint ist | Nicht sagen |
 | ------- | --------------- | ----------- |
-| **Dokument** | ein Eintrag in der Akte — Angaben plus optional ein Anhang | Datei, Upload, Eintrag |
-| **Dokumenttyp** | die Art des Dokuments; bestimmt, welche Felder es hat | Kategorie, Art, Klasse |
+| **Dokument** | ein Eintrag in der Akte — Angaben plus beliebig viele Anhänge | Datei, Upload, Eintrag |
+| **Dokumenttyp** | die Art des Dokuments; ein Schlagwort zum Filtern | Kategorie, Art, Klasse |
 | **Anhang** | die angehängte Datei zu einem Dokument | Datei, Attachment, Upload |
 
 Zwei Ausnahmen, und nur diese zwei:
 
-**Englische Bezeichner sind keine deutsche Prosa.** Der JSON-Key heißt `attachment` und die
+**Englische Bezeichner sind keine deutsche Prosa.** Der JSON-Key heißt `attachments` und die
 Klasse `Attachment`, weil oben steht, dass JSON-Keys englisch sind — `attachment` *ist* die
 englische Übersetzung von **Anhang** und damit richtig. Verboten ist „Attachment" im
 deutschen Satz („das Attachment wird gespeichert"), nicht der Bezeichner. Dasselbe gilt für
@@ -53,17 +55,54 @@ Begriff. Überall sonst im Code heißt er **Anhang**.
 
 ## Das Modell
 
-Ein **Dokument** besteht aus zwei Gruppen von Angaben und höchstens einem **Anhang**:
+Ein **Dokument** besteht aus beschreibenden Angaben — `document_type`, `title`,
+`description`, `tags` — und **beliebig vielen Anhängen**. Für jedes Dokument gelten
+dieselben Felder, unabhängig vom Typ.
 
-- **Für jeden Typ gleich** — `title`, `description`, `tags`, `source`. Sie machen ein
-  Dokument in der Liste auffindbar, unabhängig davon, was es ist.
-- **Vom Dokumenttyp abhängig** — `fields`, ein freier Satz Schlüssel/Wert. Ein
-  `laborwert` trägt hier andere Angaben als ein `arztbrief`.
+**`source` gehört zum Anhang, nicht zum Dokument.** Die Herkunft beschreibt, woher *dieses
+Blatt* kam; ein Dokument darf Anhänge aus verschiedenen Quellen bündeln — den Scan aus der
+Radiologie und die Notiz aus der eigenen Praxis.
 
-Damit ist auch die Begründung aus
-[ADR-0002](./adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md) wieder tragend:
-Die zweite Datenbank rechtfertigt sich über die **Heterogenität der Angaben**. Hätte jedes
-Dokument dieselben Felder, gäbe es keinen Grund für MongoDB.
+### Warum es keine typabhängigen Felder gibt
+
+Ein Dokument hatte zwischenzeitlich ein Feld `fields`: einen freien Satz Schlüssel/Wert,
+den jeder Dokumenttyp nach Belieben füllen konnte. **Das ist wieder entfernt worden**, und
+zwar aus einem Grund, der in einer Akte schwerer wiegt als die verlorene Flexibilität:
+
+> Ohne eine **Definition je Dokumenttyp** entstehen redundante Daten. Der eine schreibt
+> `hb`, der nächste `Hb`, der dritte `haemoglobin` — drei Schlüssel für denselben Wert.
+> Eine Auswertung über „alle Hämoglobinwerte dieses Patienten" findet dann ein Drittel.
+> Dasselbe für Einheiten: `g/dl` neben `g/dL` neben `gramm pro deziliter`.
+>
+> Ein freies Objekt kann außerdem nichts erzwingen und nichts prüfen: kein Pflichtfeld,
+> kein Zahlenbereich, keine Einheit, kein Tippfehler-Alarm. Es sieht aus wie Struktur und
+> ist keine.
+
+**Vertagt, nicht verworfen.** Typabhängige Felder kommen, sobald je Dokumenttyp festliegt,
+welche Felder es gibt — Name, Datentyp, Einheit, Pflicht ja/nein. Dann validiert das
+Backend gegen diesen Katalog, und das Frontend baut das Eingabeformular daraus, statt ein
+leeres JSON-Feld anzubieten. Bis dahin gilt: **keine Felder statt beliebiger Felder.**
+
+Was das braucht, in dieser Reihenfolge:
+
+1. Fachliche Festlegung je Typ — welche Felder trägt ein `laborwert`, welche ein `befund`?
+2. Eine Ablage für diesen Katalog (Collection oder Datei) und ein Endpunkt, der ihn ausgibt.
+3. Prüfung beim Anlegen gegen den Katalog des angegebenen Typs.
+
+Schritt 1 ist fachliche Arbeit und gehört nicht ins Backend allein.
+
+> ### ⚠ Das trifft ADR-0002 und gehört ins Daily
+>
+> [ADR-0002](./adr/0002-postgres-fuer-stammdaten-mongodb-fuer-dokumente.md) begründet die
+> zweite Datenbank mit der **Heterogenität der Angaben**: „Ein Laborwert hat völlig andere
+> Felder als ein Arztbrief." Solange es keine typabhängigen Felder gibt, stimmt das nicht —
+> alle Dokumente sind gleich aufgebaut, und die Anhänge sind eine gewöhnliche Liste. **Was
+> heute in MongoDB liegt, könnte PostgreSQL genauso.**
+>
+> Das ist kein Grund, sofort umzubauen: MongoDB läuft, ist eingerichtet, und der Katalog
+> oben bringt die Heterogenität zurück. Aber ADR-0002 nennt sich selbst „ein zentraler
+> Punkt der Abschlusspräsentation" — und dort wird jemand genau das fragen. Die ehrliche
+> Antwort ist der Fahrplan oben, nicht die alte Begründung.
 
 ## Wo was liegt
 
@@ -72,8 +111,8 @@ Drei Speicher, jeder für das, was er kann:
 | | Wo |
 | - | -- |
 | Patientenstammdaten | PostgreSQL |
-| Angaben zum Dokument (Typ, Titel, Tags, `fields` …) | MongoDB, Collection `documents` |
-| Die Bytes eines Anhangs | Docker-Volume unter `UPLOAD_DIR` |
+| Angaben zum Dokument (Typ, Titel, Tags, Anhang-Angaben …) | MongoDB, Collection `documents` |
+| Die Bytes der Anhänge | Docker-Volume unter `UPLOAD_DIR` |
 
 MongoDB speichert **keine Dateien** — das ist der Punkt, den ADR-0002 ausdrücklich
 festhält. In der Datenbank steht nur, wo der Anhang liegt.
@@ -96,33 +135,33 @@ wer das Backend ohne Compose startet, setzt sie in der `.env`.
 | `title` | str | **Pflicht**, wird getrimmt, darf nicht leer sein |
 | `description` | str \| null | |
 | `tags` | str[] | siehe unten |
-| `source` | str \| null | woher das Dokument stammt, z. B. `"Radiologie Mitte"` |
-| `fields` | object | die typabhängigen Angaben, siehe unten. `{}`, wenn keine |
-| `attachment` | object \| null | der Anhang, oder `null` |
+| `attachments` | object[] | die Anhänge — **nie `null`**, höchstens leer |
 | `created_at` | datetime | vom Server, UTC |
 
-Der **Anhang**, wenn es einen gibt:
+Jeder Eintrag in **`attachments`**:
 
 | Feld | Typ | |
 | ---- | --- | - |
-| `attachment.filename` | str \| null | der ursprüngliche Dateiname — **nur als Angabe** |
-| `attachment.content_type` | str \| null | was der Browser gemeldet hat |
-| `attachment.size_bytes` | int | tatsächlich geschriebene Bytes |
+| `id` | str | vom Server vergeben |
+| `filename` | str \| null | der ursprüngliche Dateiname — **nur als Angabe** |
+| `content_type` | str \| null | was der Browser gemeldet hat |
+| `size_bytes` | int | tatsächlich geschriebene Bytes |
+| `source` | str \| null | woher **dieses Blatt** stammt, z. B. `"Radiologie Mitte"` |
+| `url` | str | Adresse zum **Ansehen** (Vorschau) |
+| `download_url` | str | Adresse zum **Herunterladen** |
 
-Pflicht sind nur **`document_type` und `title`**. Alles andere darf fehlen — auch der
-Anhang.
+Pflicht sind nur **`document_type` und `title`**. Alles andere darf fehlen — auch die
+Anhänge.
 
-`attachment` ist ein eigenes Objekt und kein Satz einzelner Felder am Dokument. So drückt
-die Antwort aus, was CONTEXT.md sagt: **höchstens einer, und keiner ist gültig.** Als drei
-nullbare Felder nebeneinander liesse sich nicht ausdrücken, dass sie nur gemeinsam
-vorkommen.
+`attachments` ist **immer eine Liste**, nie `null`. Ein Dokument ohne Anhang hat `[]`;
+damit lässt sich im Frontend ohne Fallprüfung darüber laufen.
 
 `filename` ist `null`, wenn der Aufrufer keinen Namen mitgeschickt hat. Der Server denkt
 sich **keinen** aus: Ein zusammengebautes `<id>.bin` sähe im Frontend aus wie ein echter
 Name des Benutzers.
 
 Nicht ausgeliefert werden `stored_as` (der Speicherort) und `created_by`. Der Ablageort
-geht von außen niemanden etwas an.
+geht von außen niemanden etwas an — an seine Stelle treten `url` und `download_url`.
 
 ### `document_type`
 
@@ -138,30 +177,6 @@ Codeänderung.
 
 `befund` · `arztbrief` · `laborwert` · `sonstiges`
 
-### `fields`
-
-Die Angaben, die vom Dokumenttyp abhängen. Reisen als **JSON-Objekt in einem Formularfeld**
-— ein Multipart-Formular kennt keine verschachtelten Werte:
-
-```
-fields={"hb": 13.4, "einheit": "g/dl"}      →      "fields": {"hb": 13.4, "einheit": "g/dl"}
-```
-
-| Regel | |
-| ----- | - |
-| Werte | ein einzelner Wert je Schlüssel — Text, Zahl oder Wahrheitswert |
-| keine Bäume | Listen und verschachtelte Objekte ergeben `422` |
-| kaputtes JSON | ergibt `422` mit `field: "fields"`, keinen `500` |
-| Grenzen | höchstens 50 Angaben, Schlüssel 60 Zeichen, Textwerte 500 Zeichen — darüber `422` |
-| leerer Schlüssel | ergibt `422` |
-| fehlt | `{}` |
-
-Die Grenzen sollen einen Unfall abfangen, keine Fachlichkeit vorschreiben, die noch
-niemand kennt. Überschritten wird **abgelehnt, nicht gekürzt**: Ein stilles Abschneiden
-gäbe ein `201` auf einen Wert zurück, in dem hinten etwas fehlt, und die Antwort sähe
-genauso aus wie bei einem heilen. In einer Akte ist ein abgeschnittener Wert schlimmer als
-ein abgelehnter.
-
 ### `tags`
 
 Kommt **kommagetrennt** herein und geht als **Liste** wieder hinaus:
@@ -174,12 +189,12 @@ Kleingeschrieben und ohne Dubletten, damit `MRT` und `mrt` beim Filtern nicht zw
 Schlagworte sind. Die Reihenfolge der ersten Nennung bleibt erhalten — sonst flackerte die
 Liste im Frontend bei jedem Laden. Höchstens 20 Tags, je höchstens 40 Zeichen.
 
-## POST /docs/{patient_id}
+## POST /patients/{patient_id}/documents
 
-**Multipart-Formular**, die Angaben plus optional das Feld `file`:
+**Multipart-Formular**, die Angaben plus beliebig viele Felder `files`:
 
 ```
-POST /docs/42
+POST /patients/42/documents
 Authorization: Bearer <token>
 Content-Type: multipart/form-data
 
@@ -187,9 +202,9 @@ document_type=befund
 title=Befund MRT
 description=Knie links
 tags=mrt, radiologie
-source=Radiologie Mitte
-fields={"koerperregion": "Knie links", "befundet": true}
-file=@befund.pdf                      ← optional
+files=@seite1.pdf                     ← beliebig oft, auch gar nicht
+files=@seite2.pdf
+source=Radiologie Mitte               ← je Anhang, oder einmal für alle
 ```
 
 **Response `201`**
@@ -202,27 +217,45 @@ file=@befund.pdf                      ← optional
   "title": "Befund MRT",
   "description": "Knie links",
   "tags": ["mrt", "radiologie"],
-  "source": "Radiologie Mitte",
-  "fields": { "koerperregion": "Knie links", "befundet": true },
-  "attachment": {
-    "filename": "befund.pdf",
-    "content_type": "application/pdf",
-    "size_bytes": 284913
-  },
+  "attachments": [
+    {
+      "id": "3fb1ce719d244a10bb5373163be8c1e7",
+      "filename": "seite1.pdf",
+      "content_type": "application/pdf",
+      "size_bytes": 284913,
+      "source": "Radiologie Mitte",
+      "url": "/patients/42/documents/9f2c1ab34d5e4f7a8b0c1d2e3f4a5b6c/attachments/3fb1ce719d244a10bb5373163be8c1e7",
+      "download_url": "/patients/42/documents/9f2c1ab34d5e4f7a8b0c1d2e3f4a5b6c/attachments/3fb1ce719d244a10bb5373163be8c1e7?download=true"
+    }
+  ],
   "created_at": "2026-08-06T12:54:04.642189Z"
 }
 ```
 
+### Die Herkunft je Anhang
+
+`source` wird den Anhängen **der Reihe nach** zugeordnet:
+
+| Anhänge | `source` | Ergebnis |
+| ------- | -------- | -------- |
+| 3 | einmal `"Radiologie Mitte"` | gilt für alle drei |
+| 2 | `"Radiologie Mitte"`, `"Eigene Praxis"` | je Anhang einer |
+| 3 | zwei Angaben | der dritte bleibt ohne — kein Fehler |
+| 2 | gar keine | beide ohne — `source` ist optional |
+
 ### Ohne Anhang
 
-CONTEXT.md: „Ein Dokument ohne Anhang ist gültig." Ein Laborwert braucht keinen Scan.
+Ein Laborwert braucht keinen Scan. **Das Feld `files` einfach weglassen** — dann entsteht
+ein Dokument mit `"attachments": []`, und die Platte wird gar nicht erst angefasst.
 
-**Das Feld `file` einfach weglassen** — dann entsteht ein Dokument mit `"attachment": null`,
-und die Platte wird gar nicht erst angefasst.
-
-> **Weglassen, nicht leer schicken.** Wird `file` mitgeschickt, muss etwas drin sein: Eine
-> angehängte Datei mit null Bytes ist ein Versehen und ergibt `422`. Das Frontend hängt das
-> Feld also nur an, wenn der Benutzer wirklich etwas ausgewählt hat.
+> **Weglassen, nicht leer schicken.** Wird ein Anhang mitgeschickt, muss etwas drin sein:
+> eine Datei mit null Bytes ist ein Versehen und ergibt `422`. Das Frontend hängt das Feld
+> also nur an, wenn der Benutzer wirklich etwas ausgewählt hat.
+>
+> **Achtung, Nebenwirkung:** Da `source` am Anhang hängt, hat ein Dokument **ohne** Anhang
+> auch keine Herkunft mehr. In den Testdaten hat das sechs Laborwerte ihre Quelle gekostet
+> („Labor Berlin Mitte"). Wer die Herkunft auch ohne Anhang braucht, muss sie zusätzlich
+> ans Dokument hängen — das wäre eine Änderung am Vertrag.
 
 ### Die 20-MB-Grenze
 
@@ -249,14 +282,18 @@ Dokument in der Datenbank noch eine angefangene Datei auf der Platte.
 ### Der Dateiname wird nie zum Pfad
 
 Er kommt aus dem Browser und darf alles enthalten — `../../../etc/passwd` ebenso wie einen
-Patientennamen. Gespeichert wird unter `{UPLOAD_DIR}/{patient_id}/{document_id}`; der
-ursprüngliche Name überlebt nur als Angabe `attachment.filename`. Von der Endung wird
-höchstens ein harmloses `.pdf` übernommen.
+Patientennamen. Gespeichert wird unter
+`{UPLOAD_DIR}/{patient_id}/{document_id}/{attachment_id}`; der ursprüngliche Name überlebt
+nur als Angabe `filename`. Von der Endung wird höchstens ein harmloses `.pdf` übernommen.
 
-## GET /docs/{patient_id}
+Ein Ordner je Dokument, darin eine Datei je Anhang — seit ein Dokument mehrere tragen kann,
+hielte ein gemeinsamer Ordner sie nur über den Dateinamen auseinander, und der kommt vom
+Aufrufer.
+
+## GET /patients/{patient_id}/documents
 
 ```
-GET /docs/42?q=mrt&limit=100&offset=0
+GET /patients/42/documents?q=mrt&limit=100&offset=0
 Authorization: Bearer <token>
 ```
 
@@ -285,11 +322,43 @@ für einen Patienten, der noch gar keine Dokumente hat.
 Regex-Sonderzeichen in `q` werden maskiert und suchen sich selbst — `.*` findet nichts,
 nicht alles, und eine Klammer bricht die Suche nicht ab.
 
-> `q` durchsucht **Titel und Beschreibung**, nicht `fields`. Die typabhängigen Angaben
-> stehen unter frei gewählten Schlüsseln; eine Suche darüber bräuchte erst eine Verabredung,
-> welche Schlüssel es gibt. Siehe [Offene Punkte](#offene-punkte).
+> `q` durchsucht **Titel und Beschreibung**, sonst nichts — insbesondere keine Dateinamen
+> der Anhänge. Die tragen in der Praxis oft Patientennamen; eine Suche darüber wäre eine
+> eigene Entscheidung. Siehe [Offene Punkte](#offene-punkte).
 
-## DELETE /docs/{patient_id}/{document_id}
+## GET …/documents/{document_id}/attachments/{attachment_id}
+
+**So kommt das Frontend an die Bytes eines Anhangs.** Die Adresse steht fertig in jeder
+Dokumentantwort — sie muss nicht selbst zusammengesetzt werden:
+
+| Feld | Antwort trägt | Wofür |
+| ---- | ------------- | ----- |
+| `url` | `Content-Disposition: inline` | Vorschau — `<img>`, `<iframe>`, Bild im Dialog |
+| `download_url` | `Content-Disposition: attachment` | Speichern-Dialog des Browsers |
+
+Beides ist **dieselbe Route**; `download_url` hängt nur `?download=true` an.
+
+```
+GET /patients/42/documents/9f2c…/attachments/3fb1…            → Vorschau
+GET /patients/42/documents/9f2c…/attachments/3fb1…?download=true   → Download
+Authorization: Bearer <token>
+```
+
+Die Antwort trägt `Content-Type` und den ursprünglichen Dateinamen, damit der Browser weiß,
+was er anzeigen soll und wie die Datei beim Speichern heißt.
+
+**Alle drei Kennungen müssen zusammenpassen.** Wer die Kennung eines fremden Anhangs errät,
+bekommt ihn nicht über den eigenen Patienten: Passt eine nicht, ist die Antwort `404` —
+dieselbe wie für „gibt es nicht", damit sie nicht verrät, welcher Teil gestimmt hätte.
+
+Fehlt die Datei auf der Platte, obwohl die Angaben sie nennen, kommt ebenfalls `404`; im
+Server-Log steht dann ein `ERROR` mit den Kennungen.
+
+> **Der Token muss mit.** Der Endpunkt ist geschützt wie jeder andere — ein `<img src>` im
+> Browser schickt keinen `Authorization`-Header. Das Frontend holt den Anhang deshalb per
+> `fetch` und macht daraus eine Objekt-URL, siehe [unten](#für-das-frontend).
+
+## DELETE …/documents/{document_id}
 
 `204`, kein Rumpf. **Angaben und Anhang sind danach weg** — kein Papierkorb.
 
@@ -335,23 +404,27 @@ Dieselbe Form wie überall (`status`, `message`), siehe
 | `403` | `staff` versucht zu löschen |
 | `404` | Patient oder Dokument gibt es nicht |
 | `413` | Anhang größer als 20 MB |
-| `422` | `document_type` oder `title` fehlt/ist leer, `fields` ist kein JSON-Objekt, mitgeschickter Anhang ist leer, `limit` zu groß |
+| `422` | `document_type` oder `title` fehlt/ist leer, ein mitgeschickter Anhang ist leer, mehr als 20 Anhänge, `limit` zu groß |
 
 ## Für das Frontend
+
+### Anlegen
 
 ```js
 const form = new FormData();
 form.append("document_type", "befund");
 form.append("title", "Befund MRT");
 form.append("tags", "mrt, radiologie");         // kommagetrennt
+
+// Anhaenge sind optional und duerfen mehrere sein. Das Feld nur anhaengen,
+// wenn wirklich Dateien ausgewaehlt wurden — ein leeres waere ein Fehler,
+// kein "kein Anhang".
+for (const file of files) form.append("files", file);   // aus <input type="file" multiple>
+
+// Einmal fuer alle Anhaenge — oder einmal je Anhang, in derselben Reihenfolge.
 form.append("source", "Radiologie Mitte");
-form.append("fields", JSON.stringify({ koerperregion: "Knie links" }));
 
-// Der Anhang ist optional — das Feld nur anhaengen, wenn wirklich eine Datei
-// ausgewaehlt wurde. Ein leeres Feld waere ein Fehler, kein "kein Anhang".
-if (file) form.append("file", file);            // aus <input type="file">
-
-const res = await fetch(`${base}/docs/${patientId}`, {
+const res = await fetch(`${base}/patients/${patientId}/documents`, {
   method: "POST",
   headers: { Authorization: `Bearer ${token}` },  // **kein** Content-Type setzen —
   body: form,                                     // den setzt der Browser mit boundary
@@ -366,8 +439,37 @@ wer ihn überschreibt, macht das Formular unlesbar.
 Die Größe lässt sich vorab im Browser prüfen (`file.size > 20 * 1024 * 1024`) — das spart
 den Upload. Es ist Bedienkomfort, keine Absicherung: Durchgesetzt wird im Backend.
 
-Beim Anzeigen: `attachment` kann `null` sein. Eine Zeile ohne Anhang ist kein Fehlerfall,
-sondern ein gültiges Dokument.
+### Anhang anzeigen oder herunterladen
+
+Der Endpunkt ist geschützt, und ein `<img src>` schickt keinen `Authorization`-Header.
+Deshalb wird der Anhang per `fetch` geholt und in eine Objekt-URL verwandelt:
+
+```js
+async function anhangOeffnen(anhang) {
+  const res = await fetch(base + anhang.url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return showMessage((await res.json()).message);
+
+  const objektUrl = URL.createObjectURL(await res.blob());
+  // <img src={objektUrl}> oder <iframe src={objektUrl}> — je nach content_type.
+  // Wenn die Vorschau zu ist: URL.revokeObjectURL(objektUrl), sonst bleibt der
+  // Blob im Speicher liegen.
+  return objektUrl;
+}
+```
+
+Zum **Herunterladen** dasselbe mit `anhang.download_url` und einem `<a download>` auf die
+Objekt-URL; `filename` aus der Antwort ist der Name, den der Benutzer erwartet.
+
+Ob Vorschau oder nur ein Link, entscheidet `content_type`: `image/*` und
+`application/pdf` lassen sich anzeigen, alles andere bietet man zum Speichern an.
+
+### Beim Anzeigen der Liste
+
+`attachments` ist **immer eine Liste** — bei einem Dokument ohne Anhang eben `[]`. Kein
+`null`-Fall, keine Sonderbehandlung. Ein Dokument ohne Anhang ist kein Fehlerfall, sondern
+ein gültiges Dokument.
 
 ## Im Audit-Trail
 
@@ -380,32 +482,31 @@ hochgeladen wird dabei nichts.
 
 **Weder Dateiname noch Titel landen im Trail.** Beide heißen in der Praxis gern
 „Mueller_Befund.pdf" und wären damit genau die Patientenangabe, die dort nicht hingehört.
-Aus demselben Grund steht auch `fields` nicht drin — dort landet in der Praxis alles.
-Festgehalten werden Dokumenttyp, Größe und Content-Type; die sagen genug, um einen Vorfall
-einzuordnen, und der Dokumenttyp ist eine feste Fachkategorie, die nichts über den
-Patienten verrät.
+Aus demselben Grund steht auch `source` nicht drin — Freitext, in dem in der Praxis alles landet.
+Festgehalten werden Dokumenttyp, die **Anzahl** der Anhänge und ihre Gesamtgröße; die sagen
+genug, um einen Vorfall einzuordnen, und der Dokumenttyp ist eine feste Fachkategorie, die
+nichts über den Patienten verrät.
 
 ## Offene Punkte
 
-- **Es gibt keinen Download.** Die Anforderung nennt Anlegen, Auflisten und Löschen — die
-  Bytes sind damit vorerst nur ablegbar, nicht wieder abrufbar. Ein
-  `GET /docs/{patient_id}/{document_id}/file` wäre der nächste Schritt und ist klein; er
-  muss nur dieselbe Prüfung fahren (Token, Patient, Zugehörigkeit) und den Speicherort
-  weiterhin geheim halten.
-- **`q` durchsucht `fields` nicht.** Sinnvoll wäre es erst, wenn je Dokumenttyp verabredet
-  ist, welche Schlüssel es gibt. Gehört ins Daily.
+- **Typabhängige Felder fehlen noch** — und mit ihnen die Begründung, die ADR-0002 für
+  MongoDB gibt. Beides hängt am selben Fahrplan: erst ein Feldkatalog je Dokumenttyp,
+  siehe [Warum es keine typabhängigen Felder gibt](#warum-es-keine-typabhängigen-felder-gibt).
+  **Fürs nächste Daily.**
+- **Ein Dokument ohne Anhang hat keine Herkunft mehr.** `source` hängt am Anhang. In den
+  Testdaten hat das sechs Laborwerte ihre Quelle gekostet.
+- **Anhänge lassen sich nur beim Anlegen mitgeben.** Es gibt keinen Endpunkt, der einem
+  bestehenden Dokument einen Anhang hinzufügt oder einen einzelnen entfernt — beides wäre
+  klein (`POST`/`DELETE` unter `…/attachments`), war aber nicht gefordert.
+- **`q` durchsucht die Anhänge nicht**, nur Titel und Beschreibung. Dateinamen wären
+  denkbar; sie tragen in der Praxis allerdings oft Patientennamen.
 - **Es gibt keine Liste erlaubter Dokumenttypen.** Das ist Absicht (CONTEXT.md: neue Typen
   ohne Schemaänderung), heißt aber auch: Ein Tippfehler legt einen neuen Typ an. Sobald das
   Frontend eine Auswahl anbietet, ist das praktisch entschärft.
-- **Der Pfad `/docs` gehört auch der Swagger-Oberfläche.** FastAPI liefert sie unter dem
-  exakten Pfad `/docs` aus, unsere Routen beginnen erst darunter (`/docs/42`) — beides
-  läuft nebeneinander, und ein Test wacht darüber. Verwechslungsfrei ist es trotzdem
-  nicht, und der übrige Bestand heißt `/patients`. **`/patients/{id}/documents` wäre der
-  saubere Zug** und würde nebenbei ausdrücken, dass ein Dokument ohne Patient nicht
-  existiert. Gehört ins Daily.
 - **Kein Virenscan, keine Typprüfung.** Angehängt werden darf alles. In einer echten
   Praxis wäre beides Pflicht.
-- **Keine Vorschau, keine Größenbeschränkung pro Patient.**
+- **Keine Größenbeschränkung pro Patient und keine Serverseiten-Vorschau.** Das Anzeigen
+  übernimmt der Browser; eine Miniaturansicht müsste das Backend erzeugen.
 
 ## Tests
 
@@ -418,12 +519,29 @@ Der wichtigste Test ist `test_der_dateiname_des_aufrufers_wird_nie_zum_pfad`.
 
 ## Testdaten
 
-[`backend/testdata/documents.json`](../backend/testdata/documents.json) füllt die Akten der
-ersten sechs Testpatienten — alle vier üblichen Dokumenttypen, mit und ohne Anhang, eines
-nur mit Pflichtangaben. Angelegt werden sie mit `python -m app.seed`
-([backend/README.md](../backend/README.md)); der Patient steht dort als Versichertennummer
-und nicht als `id`, weil die `id` davon abhängt, was vorher in der Tabelle stand.
+17 frei erfundene Dokumente liegen als JSON in
+[`backend/testdata/documents.json`](../backend/testdata/documents.json), verteilt auf die
+ersten sechs Testpatienten. Alle vier üblichen Dokumenttypen kommen vor, dazu Dokumente
+**mit einem, mit mehreren und ohne** Anhang — und Patienten ganz ohne Dokumente, damit der
+Leerzustand der Liste genauso zu sehen ist wie eine volle Akte.
 
-Die Anhänge sind **Platzhalter**: Name, Typ und Größe stimmen, die Bytes sind ein kurzer
-Text. Ausgeliefert werden sie ohnehin nicht — einen Download gibt es noch nicht (siehe
-[Offene Punkte](#offene-punkte)).
+```bash
+python -m app.seed          # legt Patienten und Dokumente an
+```
+
+Mehrfach ausführbar: Die Dokumente haben feste Kennungen (`5eed…`), ein zweiter Lauf
+erkennt sie wieder.
+
+> **`patient_id` muss zu den Kennungen aus Postgres passen.** In der Datei steht die `id`
+> direkt als Zahl. Das geht auf, weil die Patienten in der Reihenfolge von `patients.json`
+> angelegt werden und Postgres fortlaufend ab 1 vergibt — Datensatz eins wird `1`,
+> Datensatz zwei wird `2`. **Das gilt nur für eine leere Tabelle.** Wer vorher von Hand
+> Patienten angelegt hat, bekommt andere Kennungen, und dann hängen die Dokumente an den
+> falschen Leuten. Der verlässliche Weg ist ein Lauf nach `docker compose down -v`.
+>
+> Dokumente, deren Patient es nicht gibt — etwa nach `--patients 3` —, werden übersprungen
+> und in der Ausgabe gezählt. Das ist kein Fehler.
+
+Die Anhänge sind Platzhalter: In der Datei steht, wie die Datei hieß und was der Browser
+gemeldet hätte, die Bytes selbst schreibt der Seed als kurzen Text. Die Größe ist damit
+echt, und abrufbar sind sie wie alle anderen.

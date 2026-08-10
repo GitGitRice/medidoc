@@ -5,28 +5,31 @@ ausschließlich Testdaten verwendet.
 
 Der Seed füllt eine Akte, mit der sich das Frontend ansehen lässt: alle vier
 üblichen Dokumenttypen (`befund`, `arztbrief`, `laborwert`, `sonstiges`, siehe
-docs/documents-api.md), Dokumente **mit** und **ohne** Anhang, eines nur mit
-Pflichtangaben, und Patienten, die gar keine Dokumente haben — der Leerzustand
-der Liste ist genauso ein Fall wie eine volle Akte.
+docs/documents-api.md), Dokumente **mit einem, mit mehreren und ohne** Anhang,
+und Patienten, die gar keine Dokumente haben — der Leerzustand der Liste ist
+genauso ein Fall wie eine volle Akte.
 
 Drei Dinge sind hier anders als beim Patienten-Seed:
 
-**Der Patient steht als Versichertennummer in der Datei, nicht als `id`.** Die
-`id` vergibt Postgres; sie hängt davon ab, was vorher schon in der Tabelle
-stand. Die Nummer gehört dagegen zum Testdatensatz und bleibt dieselbe. Wer mit
-`--patients 3` nur die ersten Patienten anlegt, bekommt die übrigen Dokumente
-übersprungen statt an falschen Patienten hängend.
+**Der Patient steht als `patient_id` in der Datei.** Sie muss der `id` in
+Postgres entsprechen. Das tut sie, weil die Patienten in der Reihenfolge von
+`patients.json` angelegt werden und Postgres die Schlüssel fortlaufend ab 1
+vergibt — der erste Datensatz wird `1`, der zweite `2`. Das gilt nur für eine
+**leere** Tabelle: Wer vorher von Hand Patienten angelegt hat, bekommt andere
+Kennungen, und dann hängen die Dokumente an den falschen Leuten. Ein Lauf gegen
+`docker compose down -v` ist der Normalfall und stimmt immer.
 
 **Die Dokumente haben feste Kennungen** (`5eed…`, gut erkennbar gegenüber den
 sonst zufälligen). Nur damit ist der Seed mehrfach ausführbar, ohne die Akte
 jedes Mal zu verdoppeln — ein zweiter Lauf erkennt sie wieder und überspringt
-sie.
+sie. Die Anhänge bekommen ihre Kennung dagegen aus der Position: Datei eins des
+Dokuments heißt `…-1`, Datei zwei `…-2`.
 
-**Der Anhang ist ein Platzhalter.** In der Datei steht, wie die Datei hieß und
+**Die Anhänge sind Platzhalter.** In der Datei steht, wie die Datei hieß und
 was der Browser gemeldet hätte; die Bytes selbst schreibt dieser Seed als
-kurzen Text. Die API liefert Anhänge (noch) nicht aus — es gibt keinen
-Download-Endpunkt (docs/documents-api.md, Offene Punkte) —, ausgeliefert werden
-nur Name, Typ und Größe. Die Größe ist damit echt: die des Platzhalters.
+kurzen Text. Die Größe ist damit echt: die des Platzhalters. Abrufbar sind sie
+wie alle anderen, über
+`GET /patients/{patient_id}/documents/{document_id}/attachments/{id}`.
 """
 
 import json
@@ -50,24 +53,32 @@ TESTDATA = Path(__file__).resolve().parents[3] / "testdata" / "documents.json"
 
 
 @dataclass(frozen=True)
+class SeedAttachment:
+    """Ein Anhang aus den Testdaten."""
+
+    filename: str
+    content_type: str | None
+    source: str | None
+
+
+@dataclass(frozen=True)
 class SeedDocument:
     """Ein Testdokument, geprüft und fertig zum Anlegen."""
 
     id: str
-    insurance_number: str
+    patient_id: int
     metadata: DocumentMetadata
     created_at: datetime
-    filename: str | None
-    content_type: str | None
+    attachments: list[SeedAttachment]
 
 
 def load_documents() -> list[SeedDocument]:
     """Liest die Datei und prüft jeden Datensatz.
 
     Wie bei den Patienten laufen die Testdaten durch dieselbe Prüfung wie ein
-    echter `POST /docs/{patient_id}` — `DocumentMetadata` trimmt den
-    Dokumenttyp, zerlegt die Tags und weist zu große `fields` ab. Ein kaputter
-    Datensatz fällt damit beim Seed auf und nicht erst in der Oberfläche.
+    echter `POST /patients/{patient_id}/documents` — `DocumentMetadata` trimmt
+    den Dokumenttyp und zerlegt die Tags. Ein kaputter Datensatz fällt damit
+    beim Seed auf und nicht erst in der Oberfläche.
     """
     raw = json.loads(TESTDATA.read_text(encoding="utf-8"))
 
@@ -96,7 +107,7 @@ def seed_documents(session: Session) -> None:
         print(f"documents übersprungen: {missing_mongo}")
         return
 
-    patient_ids = _patient_ids_by_insurance_number(session)
+    known_patients = _existing_patient_ids(session)
     storage = get_storage()
 
     created = 0
@@ -104,48 +115,36 @@ def seed_documents(session: Session) -> None:
     without_patient = 0
 
     for document in load_documents():
-        patient_id = patient_ids.get(document.insurance_number)
-        if patient_id is None:
+        # Wer mit `--patients 3` nur die ersten Patienten anlegt, bekommt die
+        # übrigen Dokumente übersprungen statt an einer Kennung hängend, die es
+        # nicht gibt.
+        if document.patient_id not in known_patients:
             without_patient += 1
             continue
 
-        if store.get(patient_id, document.id) is not None:
+        if store.get(document.patient_id, document.id) is not None:
             skipped += 1
             continue
 
-        attachment = None
-        if document.filename is not None:
-            placeholder = _placeholder(document)
-            stored = storage.save(
-                BytesIO(placeholder),
-                patient_id=patient_id,
-                document_id=document.id,
-                filename=document.filename,
-                limit_bytes=settings.max_upload_bytes,
-            )
-            attachment = {
-                "filename": document.filename,
-                "content_type": document.content_type,
-                "size_bytes": stored.size_bytes,
-                "stored_as": stored.relative_path,
-            }
+        attachments = [
+            _write_attachment(storage, document, attachment, position)
+            for position, attachment in enumerate(document.attachments, start=1)
+        ]
 
         # Von Hand zusammengesetzt und nicht über `service.create`: Der Seed
         # braucht die feste Kennung und das feste Datum aus der Datei, beides
         # vergibt `create` selbst. Bricht der Lauf zwischen Datei und Eintrag
-        # ab, bleibt ein Anhang ohne Dokument liegen — der nächste Lauf legt
-        # ihn unter derselben Kennung wieder an und überschreibt ihn damit.
+        # ab, bleiben Anhänge ohne Dokument liegen — der nächste Lauf legt sie
+        # unter derselben Kennung wieder an und überschreibt sie damit.
         store.insert(
             {
                 "_id": document.id,
-                "patient_id": patient_id,
+                "patient_id": document.patient_id,
                 "document_type": document.metadata.document_type,
                 "title": document.metadata.title,
                 "description": document.metadata.description,
                 "tags": document.metadata.tags,
-                "source": document.metadata.source,
-                "fields": document.metadata.fields,
-                "attachment": attachment,
+                "attachments": attachments,
                 "created_at": document.created_at,
                 # Kein Benutzer hat das angelegt, sondern der Seed.
                 "created_by": None,
@@ -159,13 +158,36 @@ def seed_documents(session: Session) -> None:
     )
 
 
+def _write_attachment(
+    storage: Any, document: SeedDocument, attachment: SeedAttachment, position: int
+) -> dict[str, Any]:
+    """Schreibt den Platzhalter und gibt die Angaben zum Anhang zurück."""
+    attachment_id = f"{document.id}-{position}"
+
+    stored = storage.save(
+        BytesIO(_placeholder(document, attachment)),
+        patient_id=document.patient_id,
+        document_id=document.id,
+        attachment_id=attachment_id,
+        filename=attachment.filename,
+        limit_bytes=settings.max_upload_bytes,
+    )
+
+    return {
+        "id": attachment_id,
+        "filename": attachment.filename,
+        "content_type": attachment.content_type,
+        "size_bytes": stored.size_bytes,
+        "source": attachment.source,
+        "stored_as": stored.relative_path,
+    }
+
+
 def _to_seed_document(record: dict[str, Any]) -> SeedDocument:
     """Ein Datensatz aus der Datei wird zu einem geprüften Testdokument."""
-    attachment = record.get("attachment") or {}
-
     return SeedDocument(
         id=record["id"],
-        insurance_number=record["patient"],
+        patient_id=int(record["patient_id"]),
         metadata=DocumentMetadata(
             document_type=record["document_type"],
             title=record["title"],
@@ -173,25 +195,29 @@ def _to_seed_document(record: dict[str, Any]) -> SeedDocument:
             # Kommagetrennt wie im Formular, damit die Testdaten denselben Weg
             # nehmen wie eine echte Eingabe.
             tags=parse_tags(record.get("tags")),
-            source=record.get("source"),
-            fields=record.get("fields"),
         ),
         created_at=datetime.fromisoformat(record["created_at"]),
-        filename=attachment.get("filename"),
-        content_type=attachment.get("content_type"),
+        attachments=[
+            SeedAttachment(
+                filename=entry["filename"],
+                content_type=entry.get("content_type"),
+                source=entry.get("source"),
+            )
+            for entry in record.get("attachments") or []
+        ],
     )
 
 
-def _patient_ids_by_insurance_number(session: Session) -> dict[str, int]:
-    """Von der Versichertennummer auf die `id` — die Brücke in die Testdaten."""
+def _existing_patient_ids(session: Session) -> set[int]:
+    """Welche Patienten es wirklich gibt — die Brücke in die Testdaten."""
     return {
-        patient.insurance_number: patient.id
+        patient.id
         for patient in session.exec(select(Patient)).all()
-        if patient.insurance_number and patient.id is not None
+        if patient.id is not None
     }
 
 
-def _placeholder(document: SeedDocument) -> bytes:
+def _placeholder(document: SeedDocument, attachment: SeedAttachment) -> bytes:
     """Die Bytes eines Anhangs aus den Testdaten.
 
     Kein echter Scan, sondern ein kurzer Text, der sagt, was er ist — wer die
@@ -202,5 +228,6 @@ def _placeholder(document: SeedDocument) -> bytes:
     return (
         "Platzhalter für einen Anhang aus den Testdaten von MediDoc.\n"
         f"Dokument: {document.metadata.title}\n"
-        f"Dateiname laut Testdaten: {document.filename}\n"
+        f"Dateiname laut Testdaten: {attachment.filename}\n"
+        f"Herkunft laut Testdaten: {attachment.source or 'nicht angegeben'}\n"
     ).encode("utf-8")

@@ -1,12 +1,12 @@
 """Dokumente zu einem Patienten — ein Test pro Akzeptanzkriterium.
 
 Der Vertrag steht in docs/documents-api.md. Gegliedert nach Endpunkt, dazu die
-beiden Blöcke, die am meisten wehtun, wenn sie fehlen: die Größenprüfung des
+beiden Blöcke, die am meisten wehtun, wenn sie fehlen: die Größenprüfung eines
 Anhangs und die Ablage auf der Platte.
 
-Ein **Dokument** besteht aus Angaben, deren Felder vom **Dokumenttyp** abhängen,
-und **optional** aus einem **Anhang** (CONTEXT.md). Beide Fälle — mit und ohne
-Anhang — sind hier abgedeckt.
+Ein **Dokument** besteht aus beschreibenden Angaben und **beliebig vielen
+Anhängen** — keinem, einem oder mehreren. Alle drei Fälle sind hier abgedeckt,
+und die Bytes eines Anhangs kommen über einen eigenen Endpunkt wieder heraus.
 
 Läuft gegen den Speicher-Store und einen `tmp_path`-Ordner — kein MongoDB, kein
 Docker (siehe `documents`-Fixture in conftest.py).
@@ -16,7 +16,6 @@ backend/README.md vor.
 """
 
 import io
-import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,9 +26,7 @@ from app.modules.documents import service as documents_service
 from app.modules.documents import storage as documents_storage
 from app.modules.documents import store as documents_store
 from app.modules.documents.schemas import (
-    MAX_FIELD_KEY_LENGTH,
-    MAX_FIELD_VALUE_LENGTH,
-    MAX_FIELDS,
+    MAX_ATTACHMENTS,
     DocumentMetadata,
     parse_tags,
 )
@@ -41,7 +38,14 @@ from app.modules.documents.store import (
     normalize_term,
 )
 
-BASE = "/docs"
+
+def docs_url(patient_id) -> str:
+    """Die Dokumente eines Patienten hängen unter dem Patienten.
+
+    An einer Stelle gebaut: Das Pfadschema ist einmal gewandert, und ein
+    zweites Mal soll es nicht 43 Zeilen kosten.
+    """
+    return f"/patients/{patient_id}/documents"
 
 
 def attachment(
@@ -49,8 +53,18 @@ def attachment(
     name: str | None = "befund.pdf",
     content_type: str = "application/pdf",
 ):
-    """Ein Anhang, wie ihn ein Formular schickt."""
-    return {"file": (name, io.BytesIO(content), content_type)}
+    """Ein Anhang, wie ihn ein Formular schickt.
+
+    Als Liste von Paaren und nicht als Dict: Nur so lässt sich das Feld `files`
+    mehrfach besetzen, und genau das ist seit dem Umstieg auf mehrere Anhänge
+    der Normalfall.
+    """
+    return [("files", (name, io.BytesIO(content), content_type))]
+
+
+def attachments(*parts):
+    """Mehrere Anhänge für einen Request."""
+    return [entry for part in parts for entry in part]
 
 
 def create(
@@ -69,7 +83,7 @@ def create(
     files = form.pop("files", None) or attachment()
     data = {"document_type": "befund", "title": "Befund MRT"} | form
     return client.post(
-        f"{BASE}/{patient_id}",
+        docs_url(patient_id),
         files=None if without_attachment else files,
         data=data,
         headers=headers,
@@ -77,7 +91,7 @@ def create(
 
 
 class TestAnlegen:
-    """POST /docs/{patient_id}"""
+    """POST /patients/{patient_id}/documents"""
 
     def test_legt_das_dokument_an_und_liefert_201(
         self, client: TestClient, admin_headers, make_patient
@@ -112,7 +126,7 @@ class TestAnlegen:
         assert body["title"] == "Laborwerte Januar"
         assert body["description"] == "Grosses Blutbild"
         assert body["tags"] == ["labor", "blutbild"]
-        assert body["source"] == "Labor Berlin"
+        assert body["attachments"][0]["source"] == "Labor Berlin"
         assert body["created_at"]
 
     def test_liefert_die_angaben_zum_anhang_mit(
@@ -123,9 +137,9 @@ class TestAnlegen:
 
         body = create(client, admin_headers, patient.id).json()
 
-        assert body["attachment"]["filename"] == "befund.pdf"
-        assert body["attachment"]["content_type"] == "application/pdf"
-        assert body["attachment"]["size_bytes"] == len(b"%PDF-1.4 Testinhalt")
+        assert body["attachments"][0]["filename"] == "befund.pdf"
+        assert body["attachments"][0]["content_type"] == "application/pdf"
+        assert body["attachments"][0]["size_bytes"] == len(b"%PDF-1.4 Testinhalt")
 
     def test_nur_typ_und_titel_reichen(
         self, client: TestClient, admin_headers, make_patient
@@ -135,9 +149,8 @@ class TestAnlegen:
         body = create(client, admin_headers, patient.id).json()
 
         assert body["description"] is None
-        assert body["source"] is None
+        assert body["attachments"][0]["source"] is None
         assert body["tags"] == []
-        assert body["fields"] == {}
 
     def test_fehlender_titel_liefert_422(
         self, client: TestClient, admin_headers, make_patient
@@ -145,7 +158,7 @@ class TestAnlegen:
         patient = make_patient()
 
         response = client.post(
-            f"{BASE}/{patient.id}",
+            docs_url(patient.id),
             files=attachment(),
             data={"document_type": "befund"},
             headers=admin_headers,
@@ -183,7 +196,7 @@ class TestAnlegen:
         patient = make_patient()
 
         response = client.post(
-            f"{BASE}/{patient.id}",
+            docs_url(patient.id),
             files=attachment(),
             data={"document_type": "befund", "title": "X"},
         )
@@ -192,7 +205,7 @@ class TestAnlegen:
 
 
 class TestDokumenttyp:
-    """CONTEXT.md: Der Dokumenttyp bestimmt, welche Felder ein Dokument hat."""
+    """Der Dokumenttyp ist ein Schlagwort — er bestimmt (noch) keine Felder."""
 
     def test_fehlender_dokumenttyp_liefert_422(
         self, client: TestClient, admin_headers, make_patient
@@ -200,7 +213,7 @@ class TestDokumenttyp:
         patient = make_patient()
 
         response = client.post(
-            f"{BASE}/{patient.id}",
+            docs_url(patient.id),
             files=attachment(),
             data={"title": "Ohne Typ"},
             headers=admin_headers,
@@ -243,164 +256,6 @@ class TestDokumenttyp:
         assert response.json()["document_type"] == "impfausweis"
 
 
-class TestTypabhaengigeAngaben:
-    """`fields` — die Angaben, die vom Dokumenttyp abhängen."""
-
-    def test_kommen_als_objekt_zurueck(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        patient = make_patient()
-
-        body = create(
-            client,
-            admin_headers,
-            patient.id,
-            document_type="laborwert",
-            fields='{"hb": 13.4, "einheit": "g/dl"}',
-        ).json()
-
-        assert body["fields"] == {"hb": 13.4, "einheit": "g/dl"}
-
-    def test_zwei_typen_tragen_verschiedene_felder(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        """Der Punkt der Übung: kein gemeinsames Schema."""
-        patient = make_patient()
-
-        lab = create(
-            client,
-            admin_headers,
-            patient.id,
-            document_type="laborwert",
-            fields='{"hb": 13.4}',
-        ).json()
-        letter = create(
-            client,
-            admin_headers,
-            patient.id,
-            document_type="arztbrief",
-            fields='{"absender": "Praxis Nord", "fachrichtung": "Kardiologie"}',
-        ).json()
-
-        assert lab["fields"] == {"hb": 13.4}
-        assert letter["fields"] == {
-            "absender": "Praxis Nord",
-            "fachrichtung": "Kardiologie",
-        }
-
-    def test_ohne_angaben_ist_es_ein_leeres_objekt(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        patient = make_patient()
-
-        assert create(client, admin_headers, patient.id).json()["fields"] == {}
-
-    def test_kaputtes_json_liefert_422_und_keinen_500(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        patient = make_patient()
-
-        response = create(client, admin_headers, patient.id, fields="{kaputt")
-
-        assert response.status_code == 422
-        assert response.json()["errors"][0]["field"] == "fields"
-
-    def test_eine_liste_ist_kein_objekt(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        patient = make_patient()
-
-        response = create(client, admin_headers, patient.id, fields='["a", "b"]')
-
-        assert response.status_code == 422
-
-    def test_verschachtelte_werte_werden_abgewiesen(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        """Sonst liesse sich ein ganzer Baum in `fields` ablegen."""
-        patient = make_patient()
-
-        response = create(
-            client, admin_headers, patient.id, fields='{"a": {"b": "c"}}'
-        )
-
-        assert response.status_code == 422
-
-    def test_ein_wahrheitswert_bleibt_ein_wahrheitswert(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        """In Python ist `True` ein `int` — ohne Sorgfalt würde daraus `1`."""
-        patient = make_patient()
-
-        body = create(
-            client, admin_headers, patient.id, fields='{"befundet": true}'
-        ).json()
-
-        assert body["fields"]["befundet"] is True
-
-    def test_zu_viele_angaben_werden_abgewiesen(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        patient = make_patient()
-        zu_viele = json.dumps({f"f{i}": i for i in range(MAX_FIELDS + 1)})
-
-        response = create(client, admin_headers, patient.id, fields=zu_viele)
-
-        assert response.status_code == 422
-
-    def test_zu_langer_schluessel_wird_abgewiesen_nicht_gekuerzt(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        """Ein stilles Kürzen gäbe `201` auf etwas zurück, dem hinten etwas fehlt."""
-        patient = make_patient()
-        schluessel = "s" * (MAX_FIELD_KEY_LENGTH + 1)
-
-        response = create(
-            client, admin_headers, patient.id, fields=json.dumps({schluessel: "x"})
-        )
-
-        assert response.status_code == 422
-        assert response.json()["errors"][0]["field"] == "fields"
-
-    def test_zu_langer_wert_wird_abgewiesen_nicht_gekuerzt(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        patient = make_patient()
-        wert = "w" * (MAX_FIELD_VALUE_LENGTH + 1)
-
-        response = create(
-            client, admin_headers, patient.id, fields=json.dumps({"befund": wert})
-        )
-
-        assert response.status_code == 422
-
-    def test_die_grenzen_selbst_gehen_noch_durch(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        """Genau auf der Grenze ist erlaubt — abgewiesen wird erst darüber."""
-        patient = make_patient()
-        schluessel = "s" * MAX_FIELD_KEY_LENGTH
-        wert = "w" * MAX_FIELD_VALUE_LENGTH
-
-        body = create(
-            client, admin_headers, patient.id, fields=json.dumps({schluessel: wert})
-        ).json()
-
-        assert body["fields"][schluessel] == wert
-
-    def test_ein_leerer_schluessel_wird_abgewiesen(
-        self, client: TestClient, admin_headers, make_patient
-    ):
-        """Stilles Weglassen hiesse: Die Antwort zeigt weniger, als geschickt wurde."""
-        patient = make_patient()
-
-        response = create(
-            client, admin_headers, patient.id, fields='{"  ": "irgendwas"}'
-        )
-
-        assert response.status_code == 422
-
-
 class TestOhneAnhang:
     """CONTEXT.md: Ein Dokument ohne Anhang ist gültig."""
 
@@ -412,7 +267,7 @@ class TestOhneAnhang:
         response = create(client, admin_headers, patient.id, without_attachment=True)
 
         assert response.status_code == 201
-        assert response.json()["attachment"] is None
+        assert response.json()["attachments"] == []
 
     def test_es_bleibt_nichts_auf_der_platte(
         self, client: TestClient, admin_headers, make_patient, upload_dir
@@ -432,10 +287,10 @@ class TestOhneAnhang:
         patient = make_patient()
         create(client, admin_headers, patient.id, without_attachment=True)
 
-        body = client.get(f"{BASE}/{patient.id}", headers=admin_headers).json()
+        body = client.get(docs_url(patient.id), headers=admin_headers).json()
 
         assert body["total"] == 1
-        assert body["items"][0]["attachment"] is None
+        assert body["items"][0]["attachments"] == []
 
     def test_es_laesst_sich_loeschen(
         self, client: TestClient, admin_headers, make_patient
@@ -447,7 +302,7 @@ class TestOhneAnhang:
         ).json()
 
         response = client.delete(
-            f"{BASE}/{patient.id}/{document['id']}", headers=admin_headers
+            f"{docs_url(patient.id)}/{document['id']}", headers=admin_headers
         )
 
         assert response.status_code == 204
@@ -485,7 +340,7 @@ class TestAnhangGroesse:
         )
 
         assert response.status_code == 201
-        assert response.json()["attachment"]["size_bytes"] == 1024
+        assert response.json()["attachments"][0]["size_bytes"] == 1024
 
     def test_ueber_der_grenze_liefert_413(
         self, client: TestClient, admin_headers, make_patient, monkeypatch
@@ -511,7 +366,7 @@ class TestAnhangGroesse:
         create(client, admin_headers, patient.id, files=attachment(b"x" * 5000))
 
         assert (
-            client.get(f"{BASE}/{patient.id}", headers=admin_headers).json()["total"]
+            client.get(docs_url(patient.id), headers=admin_headers).json()["total"]
             == 0
         )
 
@@ -540,10 +395,12 @@ class TestAblage:
             client, admin_headers, patient.id, files=attachment(content)
         )
 
-        found = list((upload_dir / str(patient.id)).glob("*"))
+        document = response.json()
+        found = list((upload_dir / str(patient.id) / document["id"]).glob("*"))
         assert len(found) == 1
         assert found[0].read_bytes() == content
-        assert response.json()["id"] in found[0].name
+        # Ein Ordner je Dokument, darin eine Datei je Anhang.
+        assert document["attachments"][0]["id"] in found[0].name
 
     def test_jeder_patient_bekommt_einen_eigenen_ordner(
         self, client: TestClient, admin_headers, make_patient, upload_dir
@@ -574,11 +431,13 @@ class TestAblage:
         )
 
         assert response.status_code == 201
+        document = response.json()
         written = [p for p in upload_dir.rglob("*") if p.is_file()]
         assert len(written) == 1
-        # Die Datei liegt im Ordner des Patienten, ihr Name ist die Kennung.
-        assert written[0].parent == upload_dir / str(patient.id)
-        assert response.json()["id"] in written[0].name
+        # Die Datei liegt im Ordner des Dokuments, ihr Name ist die Kennung
+        # des Anhangs — vom Namen des Aufrufers bleibt nichts übrig.
+        assert written[0].parent == upload_dir / str(patient.id) / document["id"]
+        assert document["attachments"][0]["id"] in written[0].name
 
     def test_der_urspruengliche_name_bleibt_als_angabe_erhalten(
         self, client: TestClient, admin_headers, make_patient
@@ -589,7 +448,7 @@ class TestAblage:
             client, admin_headers, patient.id, files=attachment(name="Mein Befund.pdf")
         ).json()
 
-        assert body["attachment"]["filename"] == "Mein Befund.pdf"
+        assert body["attachments"][0]["filename"] == "Mein Befund.pdf"
 
     def test_ohne_namen_bleibt_der_name_leer(self):
         """Kein erfundener Name: `null` heisst „der Aufrufer hat keinen geschickt".
@@ -605,13 +464,17 @@ class TestAblage:
         document = documents_service.create(
             patient_id=1,
             metadata=DocumentMetadata(document_type="befund", title="Ohne Namen"),
-            stream=io.BytesIO(b"inhalt"),
-            filename=None,
-            content_type="application/pdf",
+            attachments=[
+                documents_service.IncomingAttachment(
+                    stream=io.BytesIO(b"inhalt"),
+                    filename=None,
+                    content_type="application/pdf",
+                )
+            ],
         )
 
-        assert document.attachment is not None
-        assert document.attachment.filename is None
+        assert len(document.attachments) == 1
+        assert document.attachments[0].filename is None
 
     @pytest.mark.parametrize(
         ("filename", "expected"),
@@ -629,8 +492,371 @@ class TestAblage:
         assert safe_suffix(filename) == expected
 
 
+class TestMehrereAnhaenge:
+    """Ein Befund aus drei gescannten Seiten ist **ein** Dokument."""
+
+    def test_ein_dokument_traegt_mehrere_anhaenge(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+
+        body = create(
+            client,
+            admin_headers,
+            patient.id,
+            files=attachments(
+                attachment(b"seite eins", "seite1.pdf"),
+                attachment(b"seite zwei", "seite2.pdf"),
+                attachment(b"seite drei", "seite3.pdf"),
+            ),
+        ).json()
+
+        assert len(body["attachments"]) == 3
+        assert [a["filename"] for a in body["attachments"]] == [
+            "seite1.pdf",
+            "seite2.pdf",
+            "seite3.pdf",
+        ]
+
+    def test_jeder_anhang_bekommt_eine_eigene_kennung(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+
+        body = create(
+            client,
+            admin_headers,
+            patient.id,
+            files=attachments(attachment(name="a.pdf"), attachment(name="b.pdf")),
+        ).json()
+
+        kennungen = [a["id"] for a in body["attachments"]]
+        assert len(set(kennungen)) == 2
+
+    def test_jeder_anhang_liegt_als_eigene_datei(
+        self, client: TestClient, admin_headers, make_patient, upload_dir
+    ):
+        """Ein Ordner je Dokument — sonst überschrieben sie sich gegenseitig."""
+        patient = make_patient()
+
+        body = create(
+            client,
+            admin_headers,
+            patient.id,
+            files=attachments(
+                attachment(b"erste bytes", "a.pdf"),
+                attachment(b"zweite bytes", "b.pdf"),
+            ),
+        ).json()
+
+        ordner = upload_dir / str(patient.id) / body["id"]
+        dateien = sorted(p.read_bytes() for p in ordner.iterdir() if p.is_file())
+        assert dateien == [b"erste bytes", b"zweite bytes"]
+
+    def test_eine_herkunft_gilt_fuer_alle_anhaenge(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """Der übliche Fall: Ein dreiseitiger Scan kommt aus einer Praxis."""
+        patient = make_patient()
+
+        body = create(
+            client,
+            admin_headers,
+            patient.id,
+            source="Radiologie Mitte",
+            files=attachments(attachment(name="a.pdf"), attachment(name="b.pdf")),
+        ).json()
+
+        assert [a["source"] for a in body["attachments"]] == [
+            "Radiologie Mitte",
+            "Radiologie Mitte",
+        ]
+
+    def test_je_anhang_eine_eigene_herkunft(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+
+        response = client.post(
+            docs_url(patient.id),
+            files=attachments(attachment(name="a.pdf"), attachment(name="b.pdf")),
+            data={
+                "document_type": "befund",
+                "title": "Zwei Quellen",
+                "source": ["Radiologie Mitte", "Eigene Praxis"],
+            },
+            headers=admin_headers,
+        )
+
+        assert [a["source"] for a in response.json()["attachments"]] == [
+            "Radiologie Mitte",
+            "Eigene Praxis",
+        ]
+
+    def test_fehlende_herkunft_bleibt_leer(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """Weniger Angaben als Anhänge ist kein Fehler — `source` ist optional."""
+        patient = make_patient()
+
+        response = client.post(
+            docs_url(patient.id),
+            files=attachments(
+                attachment(name="a.pdf"),
+                attachment(name="b.pdf"),
+                attachment(name="c.pdf"),
+            ),
+            data={
+                "document_type": "befund",
+                "title": "Nur eine Quelle benannt",
+                "source": ["Radiologie Mitte", "Eigene Praxis"],
+            },
+            headers=admin_headers,
+        )
+
+        assert [a["source"] for a in response.json()["attachments"]] == [
+            "Radiologie Mitte",
+            "Eigene Praxis",
+            None,
+        ]
+
+    def test_ein_zu_grosser_anhang_nimmt_die_frueheren_mit(
+        self, client: TestClient, admin_headers, make_patient, upload_dir, monkeypatch
+    ):
+        """Es entsteht kein Dokument — also darf auch nichts liegenbleiben."""
+        monkeypatch.setattr(settings, "max_upload_bytes", 1024)
+        patient = make_patient()
+
+        response = create(
+            client,
+            admin_headers,
+            patient.id,
+            files=attachments(
+                attachment(b"x" * 100, "klein.pdf"),
+                attachment(b"x" * 5000, "gross.pdf"),
+            ),
+        )
+
+        assert response.status_code == 413
+        assert client.get(docs_url(patient.id), headers=admin_headers).json()["total"] == 0
+        assert [p for p in upload_dir.rglob("*") if p.is_file()] == []
+
+    def test_zu_viele_anhaenge_werden_abgewiesen(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+
+        response = create(
+            client,
+            admin_headers,
+            patient.id,
+            files=attachments(
+                *[attachment(name=f"{i}.pdf") for i in range(MAX_ATTACHMENTS + 1)]
+            ),
+        )
+
+        assert response.status_code == 422
+        assert response.json()["errors"][0]["field"] == "files"
+
+    def test_loeschen_nimmt_alle_anhaenge_mit(
+        self, client: TestClient, admin_headers, make_patient, upload_dir
+    ):
+        patient = make_patient()
+        document = create(
+            client,
+            admin_headers,
+            patient.id,
+            files=attachments(attachment(name="a.pdf"), attachment(name="b.pdf")),
+        ).json()
+
+        client.delete(f"{docs_url(patient.id)}/{document['id']}", headers=admin_headers)
+
+        assert [p for p in upload_dir.rglob("*") if p.is_file()] == []
+
+
+class TestAnhangAbrufen:
+    """GET …/documents/{document_id}/attachments/{attachment_id}"""
+
+    def test_liefert_die_bytes_zurueck(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = create(
+            client, admin_headers, patient.id, files=attachment(b"%PDF-1.4 echt")
+        ).json()
+
+        response = client.get(document["attachments"][0]["url"], headers=admin_headers)
+
+        assert response.status_code == 200
+        assert response.content == b"%PDF-1.4 echt"
+
+    def test_die_adresse_steht_fertig_in_der_antwort(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """Das Frontend soll sie nicht selbst zusammensetzen müssen."""
+        patient = make_patient()
+        document = create(client, admin_headers, patient.id).json()
+        anhang = document["attachments"][0]
+
+        assert anhang["url"] == (
+            f"/patients/{patient.id}/documents/{document['id']}"
+            f"/attachments/{anhang['id']}"
+        )
+
+    def test_typ_und_dateiname_kommen_mit(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = create(
+            client,
+            admin_headers,
+            patient.id,
+            files=attachment(name="Mein Befund.pdf", content_type="application/pdf"),
+        ).json()
+
+        response = client.get(document["attachments"][0]["url"], headers=admin_headers)
+
+        assert response.headers["content-type"] == "application/pdf"
+        # Starlette kodiert den Namen nach RFC 5987 — Leerzeichen wird %20.
+        disposition = response.headers["content-disposition"]
+        assert "Mein%20Befund.pdf" in disposition
+
+    def test_wird_zum_ansehen_ausgeliefert_nicht_zum_speichern(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """Ein Scan soll sich im Browser öffnen lassen."""
+        patient = make_patient()
+        document = create(client, admin_headers, patient.id).json()
+
+        response = client.get(document["attachments"][0]["url"], headers=admin_headers)
+
+        assert response.headers["content-disposition"].startswith("inline")
+
+    def test_die_download_adresse_erzwingt_den_speichern_dialog(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """Zwei Adressen, ein Endpunkt: `url` zeigt an, `download_url` lädt herunter."""
+        patient = make_patient()
+        document = create(client, admin_headers, patient.id).json()
+
+        response = client.get(
+            document["attachments"][0]["download_url"], headers=admin_headers
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-disposition"].startswith("attachment")
+        assert response.content == b"%PDF-1.4 Testinhalt"
+
+    def test_beide_adressen_zeigen_auf_dieselbe_route(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = create(client, admin_headers, patient.id).json()
+        anhang = document["attachments"][0]
+
+        assert anhang["download_url"] == f"{anhang['url']}?download=true"
+
+    def test_jeder_anhang_liefert_seine_eigenen_bytes(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = create(
+            client,
+            admin_headers,
+            patient.id,
+            files=attachments(
+                attachment(b"seite eins", "a.pdf"),
+                attachment(b"seite zwei", "b.pdf"),
+            ),
+        ).json()
+
+        erster, zweiter = document["attachments"]
+
+        assert client.get(erster["url"], headers=admin_headers).content == b"seite eins"
+        assert client.get(zweiter["url"], headers=admin_headers).content == b"seite zwei"
+
+    def test_staff_darf_anhaenge_lesen(
+        self, client: TestClient, staff_headers, make_patient
+    ):
+        """ADR-0005: `staff` darf Dokumente lesen."""
+        patient = make_patient()
+        document = create(client, staff_headers, patient.id).json()
+
+        response = client.get(document["attachments"][0]["url"], headers=staff_headers)
+
+        assert response.status_code == 200
+
+    def test_ohne_token_kein_anhang(self, client: TestClient, admin_headers, make_patient):
+        patient = make_patient()
+        document = create(client, admin_headers, patient.id).json()
+
+        assert client.get(document["attachments"][0]["url"]).status_code == 401
+
+    def test_unbekannte_anhang_kennung_liefert_404(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = create(client, admin_headers, patient.id).json()
+
+        response = client.get(
+            f"{docs_url(patient.id)}/{document['id']}/attachments/gibtesnicht",
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 404
+
+    def test_unbekanntes_dokument_liefert_404(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+
+        response = client.get(
+            f"{docs_url(patient.id)}/gibtesnicht/attachments/auchnicht",
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 404
+
+    def test_ein_fremder_anhang_ist_ueber_den_eigenen_patienten_nicht_zu_holen(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """Wer die Kennung errät, kommt trotzdem nicht heran."""
+        fremder = make_patient(first_name="Max")
+        eigener = make_patient(first_name="Erika")
+        document = create(client, admin_headers, fremder.id).json()
+        anhang = document["attachments"][0]
+
+        response = client.get(
+            f"{docs_url(eigener.id)}/{document['id']}/attachments/{anhang['id']}",
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 404
+
+    def test_fehlt_die_datei_auf_der_platte_gibt_es_404_und_keinen_500(
+        self, client: TestClient, admin_headers, make_patient, upload_dir
+    ):
+        """Die Angaben sagen, es gäbe ihn — auf der Platte liegt nichts."""
+        patient = make_patient()
+        document = create(client, admin_headers, patient.id).json()
+        for datei in (upload_dir / str(patient.id) / document["id"]).iterdir():
+            datei.unlink()
+
+        response = client.get(document["attachments"][0]["url"], headers=admin_headers)
+
+        assert response.status_code == 404
+
+    def test_der_speicherort_wird_nicht_verraten(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = create(client, admin_headers, patient.id).json()
+
+        assert "stored_as" not in str(document)
+
+
 class TestAuflisten:
-    """GET /docs/{patient_id}"""
+    """GET /patients/{patient_id}/documents"""
 
     def test_liefert_die_dokumente_des_patienten(
         self, client: TestClient, admin_headers, make_patient
@@ -639,7 +865,7 @@ class TestAuflisten:
         create(client, admin_headers, patient.id, title="Erstes")
         create(client, admin_headers, patient.id, title="Zweites")
 
-        response = client.get(f"{BASE}/{patient.id}", headers=admin_headers)
+        response = client.get(docs_url(patient.id), headers=admin_headers)
 
         assert response.status_code == 200
         assert response.json()["total"] == 2
@@ -653,7 +879,7 @@ class TestAuflisten:
         create(client, admin_headers, one.id, title="Gehoert Max")
         create(client, admin_headers, other.id, title="Gehoert Erika")
 
-        body = client.get(f"{BASE}/{one.id}", headers=admin_headers).json()
+        body = client.get(docs_url(one.id), headers=admin_headers).json()
 
         assert body["total"] == 1
         assert body["items"][0]["title"] == "Gehoert Max"
@@ -663,7 +889,7 @@ class TestAuflisten:
         for title in ("Erstes", "Zweites", "Drittes"):
             create(client, admin_headers, patient.id, title=title)
 
-        items = client.get(f"{BASE}/{patient.id}", headers=admin_headers).json()[
+        items = client.get(docs_url(patient.id), headers=admin_headers).json()[
             "items"
         ]
 
@@ -677,7 +903,7 @@ class TestAuflisten:
         create(client, admin_headers, patient.id, title="Laborwerte")
 
         body = client.get(
-            f"{BASE}/{patient.id}", params={"q": "mrt"}, headers=admin_headers
+            docs_url(patient.id), params={"q": "mrt"}, headers=admin_headers
         ).json()
 
         assert body["total"] == 1
@@ -693,7 +919,7 @@ class TestAuflisten:
         create(client, admin_headers, patient.id, title="Laborwerte")
 
         body = client.get(
-            f"{BASE}/{patient.id}", params={"q": "knie"}, headers=admin_headers
+            docs_url(patient.id), params={"q": "knie"}, headers=admin_headers
         ).json()
 
         assert body["total"] == 1
@@ -706,7 +932,7 @@ class TestAuflisten:
         create(client, admin_headers, patient.id, title="Befund MRT")
 
         body = client.get(
-            f"{BASE}/{patient.id}",
+            docs_url(patient.id),
             params={"q": written_as},
             headers=admin_headers,
         ).json()
@@ -720,7 +946,7 @@ class TestAuflisten:
         create(client, admin_headers, patient.id)
 
         response = client.get(
-            f"{BASE}/{patient.id}", params={"q": "gibtesnicht"}, headers=admin_headers
+            docs_url(patient.id), params={"q": "gibtesnicht"}, headers=admin_headers
         )
 
         assert response.status_code == 200
@@ -732,7 +958,7 @@ class TestAuflisten:
     ):
         patient = make_patient()
 
-        response = client.get(f"{BASE}/{patient.id}", headers=admin_headers)
+        response = client.get(docs_url(patient.id), headers=admin_headers)
 
         assert response.status_code == 200
         assert response.json() == {"items": [], "total": 0, "limit": 100, "offset": 0}
@@ -743,7 +969,7 @@ class TestAuflisten:
             create(client, admin_headers, patient.id, title=f"Dokument {number}")
 
         body = client.get(
-            f"{BASE}/{patient.id}",
+            docs_url(patient.id),
             params={"limit": 2, "offset": 2},
             headers=admin_headers,
         ).json()
@@ -758,20 +984,20 @@ class TestAuflisten:
         patient = make_patient()
 
         response = client.get(
-            f"{BASE}/{patient.id}", params={"limit": 5000}, headers=admin_headers
+            docs_url(patient.id), params={"limit": 5000}, headers=admin_headers
         )
 
         assert response.status_code == 422
 
     def test_unbekannter_patient_liefert_404(self, client: TestClient, admin_headers):
-        response = client.get(f"{BASE}/999999", headers=admin_headers)
+        response = client.get(docs_url(999999), headers=admin_headers)
 
         assert response.status_code == 404
 
     def test_ohne_token_keine_liste(self, client: TestClient, make_patient):
         patient = make_patient()
 
-        assert client.get(f"{BASE}/{patient.id}").status_code == 401
+        assert client.get(docs_url(patient.id)).status_code == 401
 
 
 class TestSuchePredikat:
@@ -799,7 +1025,7 @@ class TestSuchePredikat:
 
 
 class TestLoeschen:
-    """DELETE /docs/{patient_id}/{document_id}"""
+    """DELETE /patients/{patient_id}/documents/{document_id}"""
 
     def test_loescht_das_dokument_und_liefert_204(
         self, client: TestClient, admin_headers, make_patient
@@ -808,12 +1034,12 @@ class TestLoeschen:
         document = create(client, admin_headers, patient.id).json()
 
         response = client.delete(
-            f"{BASE}/{patient.id}/{document['id']}", headers=admin_headers
+            f"{docs_url(patient.id)}/{document['id']}", headers=admin_headers
         )
 
         assert response.status_code == 204
         assert (
-            client.get(f"{BASE}/{patient.id}", headers=admin_headers).json()["total"]
+            client.get(docs_url(patient.id), headers=admin_headers).json()["total"]
             == 0
         )
 
@@ -824,7 +1050,7 @@ class TestLoeschen:
         patient = make_patient()
         document = create(client, admin_headers, patient.id).json()
 
-        client.delete(f"{BASE}/{patient.id}/{document['id']}", headers=admin_headers)
+        client.delete(f"{docs_url(patient.id)}/{document['id']}", headers=admin_headers)
 
         assert [p for p in upload_dir.rglob("*") if p.is_file()] == []
 
@@ -835,9 +1061,9 @@ class TestLoeschen:
         doomed = create(client, admin_headers, patient.id, title="Weg").json()
         create(client, admin_headers, patient.id, title="Bleibt")
 
-        client.delete(f"{BASE}/{patient.id}/{doomed['id']}", headers=admin_headers)
+        client.delete(f"{docs_url(patient.id)}/{doomed['id']}", headers=admin_headers)
 
-        items = client.get(f"{BASE}/{patient.id}", headers=admin_headers).json()[
+        items = client.get(docs_url(patient.id), headers=admin_headers).json()[
             "items"
         ]
         assert [d["title"] for d in items] == ["Bleibt"]
@@ -848,7 +1074,7 @@ class TestLoeschen:
         patient = make_patient()
 
         response = client.delete(
-            f"{BASE}/{patient.id}/gibtesnicht", headers=admin_headers
+            f"{docs_url(patient.id)}/gibtesnicht", headers=admin_headers
         )
 
         assert response.status_code == 404
@@ -861,10 +1087,10 @@ class TestLoeschen:
         document = create(client, admin_headers, patient.id).json()
 
         first = client.delete(
-            f"{BASE}/{patient.id}/{document['id']}", headers=admin_headers
+            f"{docs_url(patient.id)}/{document['id']}", headers=admin_headers
         )
         second = client.delete(
-            f"{BASE}/{patient.id}/{document['id']}", headers=admin_headers
+            f"{docs_url(patient.id)}/{document['id']}", headers=admin_headers
         )
 
         assert first.status_code == 204
@@ -879,12 +1105,12 @@ class TestLoeschen:
         document = create(client, admin_headers, one.id).json()
 
         response = client.delete(
-            f"{BASE}/{other.id}/{document['id']}", headers=admin_headers
+            f"{docs_url(other.id)}/{document['id']}", headers=admin_headers
         )
 
         assert response.status_code == 404
         assert (
-            client.get(f"{BASE}/{one.id}", headers=admin_headers).json()["total"] == 1
+            client.get(docs_url(one.id), headers=admin_headers).json()["total"] == 1
         )
 
     def test_staff_darf_nicht_loeschen(
@@ -895,12 +1121,12 @@ class TestLoeschen:
         document = create(client, admin_headers, patient.id).json()
 
         response = client.delete(
-            f"{BASE}/{patient.id}/{document['id']}", headers=staff_headers
+            f"{docs_url(patient.id)}/{document['id']}", headers=staff_headers
         )
 
         assert response.status_code == 403
         assert (
-            client.get(f"{BASE}/{patient.id}", headers=staff_headers).json()["total"]
+            client.get(docs_url(patient.id), headers=staff_headers).json()["total"]
             == 1
         )
 
@@ -941,7 +1167,7 @@ class TestPatientGeloescht:
         client.delete(f"/patients/{one.id}", headers=admin_headers)
 
         assert (
-            client.get(f"{BASE}/{other.id}", headers=admin_headers).json()["total"] == 1
+            client.get(docs_url(other.id), headers=admin_headers).json()["total"] == 1
         )
         assert (upload_dir / str(other.id)).exists()
 
@@ -1132,7 +1358,7 @@ class TestAuditTrail:
         patient = make_patient()
         document = create(client, admin_headers, patient.id).json()
 
-        client.delete(f"{BASE}/{patient.id}/{document['id']}", headers=admin_headers)
+        client.delete(f"{docs_url(patient.id)}/{document['id']}", headers=admin_headers)
 
         found = [
             e for e in audit_store.recent(500) if e["event"] == EventType.DOCUMENT_DELETED
@@ -1157,18 +1383,13 @@ class TestAuditTrail:
         assert "Mueller" not in trail
         assert "Roentgen" not in trail
 
-    def test_auch_die_typabhaengigen_angaben_bleiben_draussen(
+    def test_die_herkunft_bleibt_draussen(
         self, client: TestClient, admin_headers, make_patient, audit_store
     ):
-        """`fields` ist frei befüllbar — dort landet in der Praxis alles."""
+        """`source` ist Freitext — dort landet in der Praxis alles."""
         patient = make_patient()
 
-        create(
-            client,
-            admin_headers,
-            patient.id,
-            fields='{"patient": "Erika Mustermann"}',
-        )
+        create(client, admin_headers, patient.id, source="Praxis Erika Mustermann")
 
         assert "Mustermann" not in str(audit_store.recent(500))
 
@@ -1241,7 +1462,7 @@ def test_die_swagger_oberflaeche_bleibt_erreichbar(client: TestClient):
 def test_die_gepruefte_route_existiert_wirklich(
     client: TestClient, admin_headers, make_patient
 ):
-    """Wächter: Ein Tippfehler in BASE würde sonst überall 404 liefern."""
+    """Wächter: Ein Tippfehler im Pfad würde sonst überall 404 liefern."""
     patient = make_patient()
 
-    assert client.get(f"{BASE}/{patient.id}", headers=admin_headers).status_code == 200
+    assert client.get(docs_url(patient.id), headers=admin_headers).status_code == 200

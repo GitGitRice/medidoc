@@ -1,4 +1,11 @@
-fastapi
+# Untergrenze, keine Festnagelung. Ab 0.141 bringt Starlette 1.x die
+# Statuskonstanten unter ihren neuen Namen mit — HTTP_413_CONTENT_TOO_LARGE
+# und HTTP_422_UNPROCESSABLE_CONTENT. Der Code benutzt ausschliesslich diese;
+# die abgekuendigten Schreibweisen (…_REQUEST_ENTITY_TOO_LARGE,
+# …_UNPROCESSABLE_ENTITY) kommen nirgends mehr vor, auch nicht ueber
+# http.HTTPStatus. Ein kuenftiger Wegfall der alten Namen trifft uns damit
+# nicht, und die Obergrenze darf offen bleiben, bis 1.0 kommt.
+fastapi>=0.141,<1.0
 uvicorn[standard]
 sqlmodel
 psycopg[binary]

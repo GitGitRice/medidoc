@@ -106,9 +106,9 @@ async def _validation_error(request: Request, exc: Exception) -> JSONResponse:
     ]
 
     return JSONResponse(
-        status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+        status_code=HTTPStatus.UNPROCESSABLE_CONTENT,
         content={
-            "status": int(HTTPStatus.UNPROCESSABLE_ENTITY),
+            "status": int(HTTPStatus.UNPROCESSABLE_CONTENT),
             "message": _validation_summary(exc.errors(), errors),
             "errors": errors,
             "detail": jsonable_encoder(exc.errors()),

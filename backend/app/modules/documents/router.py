@@ -2,13 +2,17 @@
 
 | Methode | Pfad | |
 | ------- | ---- | - |
-| `POST` | `/docs/{patient_id}` | Dokument anlegen, multipart |
-| `GET` | `/docs/{patient_id}?q=&limit=&offset=` | Dokumente auflisten |
-| `DELETE` | `/docs/{patient_id}/{document_id}` | Dokument löschen, nur `admin` |
+| `POST` | `/patients/{patient_id}/documents` | Dokument anlegen, multipart |
+| `GET` | `/patients/{patient_id}/documents?q=&limit=&offset=` | Dokumente auflisten |
+| `GET` | `…/documents/{document_id}/attachments/{attachment_id}` | Anhang abrufen |
+| `DELETE` | `…/documents/{document_id}` | Dokument löschen, nur `admin` |
 
-Ein Dokument besteht aus Angaben und **optional** einem Anhang (CONTEXT.md).
-Angelegt wird deshalb auch ohne Anhang — `multipart` bleibt es trotzdem, weil
-dieselbe Route auch den Fall mit Anhang bedient.
+Ein Dokument besteht aus Angaben und **beliebig vielen Anhängen** — auch keinem.
+Angelegt wird deshalb auch ohne Anhang; `multipart` bleibt es trotzdem, weil
+dieselbe Route auch den Fall mit Anhängen bedient.
+
+Die Bytes eines Anhangs kommen über den eigenen Abruf-Endpunkt heraus, nie über
+die Liste. Seine Adresse steht fertig in jeder Antwort (`attachments[].url`).
 
 Alle verlangen einen angemeldeten Benutzer; die Prüfung hängt wie bei den
 Patienten am Router und nicht an den einzelnen Funktionen, damit ein neu
@@ -19,11 +23,11 @@ gibt `staff` ausdrücklich „Dokumente lesen und anlegen" — Löschen steht do
 nicht, und es ist die Aktion, die Daten unwiederbringlich entfernt. Dieselbe
 Linie wie beim Löschen eines Patienten.
 
-**Zum Pfad `/docs`:** Er ist so vorgegeben. FastAPI liefert unter `/docs` seine
-eigene Swagger-Oberfläche aus — die bleibt erreichbar, weil sie auf dem exakten
-Pfad `/docs` liegt und hier erst `/docs/{patient_id}` beginnt. Verwechslungsfrei
-ist es trotzdem nicht, und der übrige Bestand heißt `/patients`. Ein Zug nach
-`/patients/{id}/documents` wäre naheliegend — siehe docs/documents-api.md.
+**Zum Pfad:** Die Dokumente hängen unter dem Patienten, weil ein Dokument ohne
+Patienten nicht existiert — der Pfad sagt dasselbe wie das Datenmodell. Der
+frühere `/docs/{patient_id}` tat das nicht und lag außerdem auf demselben
+Anfang wie FastAPIs eigene Swagger-Oberfläche unter `/docs`. Beides ist damit
+erledigt.
 """
 
 from typing import Annotated
@@ -40,6 +44,7 @@ from fastapi import (
     status,
 )
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse
 from pydantic import ValidationError
 from sqlmodel import Session
 
@@ -53,6 +58,7 @@ from app.modules.documents.schemas import (
     DocumentMetadata,
     DocumentPage,
     DocumentPublic,
+    MAX_ATTACHMENTS,
     parse_tags,
 )
 from app.modules.documents.storage import EmptyFile, FileTooLarge
@@ -60,7 +66,7 @@ from app.modules.patients import service as patients_service
 from app.modules.users.models import Role, User
 
 router = APIRouter(
-    prefix="/docs",
+    prefix="/patients/{patient_id}/documents",
     tags=["documents"],
     dependencies=[Depends(get_current_user)],
 )
@@ -76,7 +82,7 @@ UNPROCESSABLE = {"model": ErrorResponse, "description": "Eingabe ungültig"}
 
 
 @router.post(
-    "/{patient_id}",
+    "",
     response_model=DocumentPublic,
     status_code=status.HTTP_201_CREATED,
     summary="Dokument anlegen",
@@ -99,49 +105,48 @@ def create_document(
     tags: Annotated[
         str | None, Form(description="Kommagetrennt, z. B. \"mrt, radiologie\"")
     ] = None,
+    files: Annotated[
+        list[UploadFile],
+        File(description="Die Anhänge — beliebig viele, je höchstens 20 MB"),
+    ] = [],
     source: Annotated[
-        str | None, Form(description="Woher das Dokument stammt, z. B. \"Radiologie Mitte\"")
-    ] = None,
-    fields: Annotated[
-        str | None,
+        list[str],
         Form(
             description=(
-                "Die typabhängigen Angaben als JSON-Objekt, "
-                "z. B. {\"hb\": 13.4, \"einheit\": \"g/dl\"}"
+                "Herkunft je Anhang, in derselben Reihenfolge wie \"files\". "
+                "Ein einzelner Wert gilt für alle."
             )
         ),
-    ] = None,
-    file: Annotated[
-        UploadFile | None,
-        File(description="Der Anhang — optional, höchstens 20 MB"),
-    ] = None,
+    ] = [],
 ) -> DocumentPublic:
     """Legt ein Dokument in der Akte eines Patienten an.
 
-    **Multipart**, nicht JSON — anders reist ein Anhang nicht. `tags` kommt
-    kommagetrennt herein und geht als Liste wieder hinaus, `fields` als
-    JSON-Objekt.
+    **Multipart**, nicht JSON — anders reisen Anhänge nicht. `tags` kommt
+    kommagetrennt herein und geht als Liste wieder hinaus.
 
-    **Der Anhang ist optional** (CONTEXT.md: „ein Dokument ohne Anhang ist
-    gültig"). Wird das Feld `file` weggelassen, entsteht ein Dokument ohne
-    Anhang; wird es mitgeschickt, muss etwas drin sein — ein leerer Anhang ist
-    ein Versehen und ergibt `422`.
+    **Anhänge sind optional und dürfen mehrere sein.** Ohne `files` entsteht
+    ein Dokument ohne Anhang; jeder mitgeschickte muss etwas enthalten — ein
+    leerer Anhang ist ein Versehen und ergibt `422`.
 
-    Über 20 MB antwortet die API mit `413`. Geprüft wird beim Schreiben und
-    nicht danach, damit ein großer Anhang nicht erst vollständig im Speicher
-    landet.
+    `source` wird den Anhängen der Reihe nach zugeordnet. Ein einzelner Wert
+    gilt für alle — der übliche Fall, dass ein dreiseitiger Scan komplett aus
+    derselben Praxis kommt.
+
+    Über 20 MB je Anhang antwortet die API mit `413`. Geprüft wird beim
+    Schreiben und nicht danach, damit ein großer Anhang nicht erst vollständig
+    im Speicher landet. Kippt ein späterer Anhang, bleibt auch von den früheren
+    nichts liegen.
     """
     _patient_or_404(session, patient_id)
 
-    metadata = _metadata(document_type, title, description, tags, source, fields)
+    metadata = _metadata(document_type, title, description, tags)
+    attachments = _incoming_attachments(files, source)
 
     try:
         document = service.create(
             patient_id=patient_id,
             metadata=metadata,
-            stream=file.file if file is not None else None,
-            filename=file.filename if file is not None else None,
-            content_type=file.content_type if file is not None else None,
+            attachments=attachments,
             created_by=request.state.user_id,
         )
     except FileTooLarge as too_large:
@@ -171,12 +176,8 @@ def create_document(
         detail={
             "patient": f"patient:{patient_id}",
             "document_type": document.document_type,
-            "size_bytes": (
-                document.attachment.size_bytes if document.attachment else None
-            ),
-            "content_type": (
-                document.attachment.content_type if document.attachment else None
-            ),
+            "attachments": len(document.attachments),
+            "size_bytes": sum(a.size_bytes for a in document.attachments),
         },
     )
 
@@ -184,7 +185,7 @@ def create_document(
 
 
 @router.get(
-    "/{patient_id}",
+    "",
     response_model=DocumentPage,
     summary="Dokumente eines Patienten",
     responses={401: UNAUTHORIZED, 404: NOT_FOUND, 422: UNPROCESSABLE},
@@ -210,8 +211,71 @@ def list_documents(
     return DocumentPage(items=items, total=total, limit=limit, offset=offset)
 
 
+@router.get(
+    "/{document_id}/attachments/{attachment_id}",
+    summary="Anhang abrufen",
+    response_class=FileResponse,
+    responses={
+        200: {
+            "content": {"application/octet-stream": {}},
+            "description": "Die Bytes des Anhangs",
+        },
+        401: UNAUTHORIZED,
+        404: NOT_FOUND,
+    },
+)
+def get_attachment(
+    session: SessionDep,
+    patient_id: int,
+    document_id: str,
+    attachment_id: str,
+    download: Annotated[
+        bool,
+        Query(
+            description=(
+                "true erzwingt den Speichern-Dialog, sonst wird der Anhang "
+                "zum Ansehen ausgeliefert"
+            )
+        ),
+    ] = False,
+) -> FileResponse:
+    """Liefert die Bytes eines Anhangs aus.
+
+    Die Adresse steht fertig in jeder Dokumentantwort unter
+    `attachments[].url` — das Frontend muss sie nicht selbst zusammensetzen.
+
+    Alle drei Kennungen müssen zusammenpassen. Wer die Kennung eines fremden
+    Anhangs errät, bekommt ihn nicht über den eigenen Patienten: Passt eine
+    nicht, ist die Antwort `404` — dieselbe wie für „gibt es nicht", damit sie
+    nicht verrät, welcher Teil gestimmt hätte.
+
+    Standard ist `Content-Disposition: inline` — ein PDF oder ein Scan soll
+    sich im Browser ansehen lassen, ohne erst gespeichert zu werden. Mit
+    `?download=true` wird daraus `attachment`, und der Browser öffnet den
+    Speichern-Dialog. Der Dateiname steht in beiden Fällen dabei.
+
+    Beide Adressen stehen fertig in der Dokumentantwort: `attachments[].url`
+    für die Vorschau, `attachments[].download_url` für den Download.
+    """
+    _patient_or_404(session, patient_id)
+
+    attachment = service.open_attachment(patient_id, document_id, attachment_id)
+    if attachment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Anhang {attachment_id} wurde für dieses Dokument nicht gefunden",
+        )
+
+    return FileResponse(
+        attachment.path,
+        media_type=attachment.content_type,
+        filename=attachment.filename,
+        content_disposition_type="attachment" if download else "inline",
+    )
+
+
 @router.delete(
-    "/{patient_id}/{document_id}",
+    "/{document_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Dokument löschen",
     responses={401: UNAUTHORIZED, 403: FORBIDDEN, 404: NOT_FOUND},
@@ -246,13 +310,64 @@ def delete_document(
     )
 
 
+def _incoming_attachments(
+    files: list[UploadFile], sources: list[str]
+) -> list[service.IncomingAttachment]:
+    """Bündelt Dateien und Herkunftsangaben zu je einem Anhang.
+
+    Die beiden Listen kommen aus dem Formular getrennt herein und werden hier
+    der Reihe nach gepaart. Ein einzelner `source` gilt für alle Anhänge — der
+    übliche Fall, dass ein dreiseitiger Scan komplett aus derselben Praxis
+    stammt. Fehlen Angaben, bleiben die übrigen Anhänge ohne Herkunft; das ist
+    kein Fehler, `source` ist optional.
+
+    Ein Formularfeld `files` ohne Datei schickt der Browser als leeren Teil mit.
+    Der wird hier aussortiert, sonst entstünde daraus ein leerer Anhang und
+    damit ein `422` für ein Dokument, das gar keinen tragen sollte.
+    """
+    uploads = [
+        upload
+        for upload in files
+        if upload is not None and (upload.filename or upload.size)
+    ]
+
+    if len(uploads) > MAX_ATTACHMENTS:
+        raise RequestValidationError(
+            [
+                {
+                    "type": "too_long",
+                    "loc": ("body", "files"),
+                    "msg": f"höchstens {MAX_ATTACHMENTS} Anhänge",
+                    "input": len(uploads),
+                }
+            ]
+        )
+
+    given = [value.strip() for value in sources]
+
+    def source_for(position: int) -> str | None:
+        if len(given) == 1:
+            return given[0] or None
+        if position < len(given):
+            return given[position] or None
+        return None
+
+    return [
+        service.IncomingAttachment(
+            stream=upload.file,
+            filename=upload.filename,
+            content_type=upload.content_type,
+            source=source_for(position),
+        )
+        for position, upload in enumerate(uploads)
+    ]
+
+
 def _metadata(
     document_type: str,
     title: str,
     description: str | None,
     tags: str | None,
-    source: str | None,
-    fields: str | None,
 ) -> DocumentMetadata:
     """Baut die geprüften Angaben — und macht aus einem Fehler ein `422`.
 
@@ -268,8 +383,6 @@ def _metadata(
             title=title,
             description=description,
             tags=parse_tags(tags),
-            source=source,
-            fields=fields,
         )
     except ValidationError as invalid:
         # `("title",)` wird zu `("body", "title")`, damit der Feldname in der

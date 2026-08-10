@@ -51,7 +51,7 @@ docker compose exec fastapi python -m app.seed --patients 50
 Die Dokumente brauchen MongoDB (ADR-0002). Ohne `MONGO_URL` werden sie übersprungen, der
 Rest läuft; wer sie gar nicht will, hängt `--no-documents` an. Die Anhänge in den
 Testdaten sind Platzhalter: Name, Typ und Größe stimmen, die Bytes sind ein kurzer Text —
-ausgeliefert werden sie ohnehin nicht, einen Download-Endpunkt gibt es noch nicht.
+abrufen lassen sie sich trotzdem, über `attachments[].url` aus der Dokumentantwort.
 
 Bei Modelländerungen zieht `create_all` geänderte Spalten **nicht** nach. Tabellen
 wegwerfen und neu seeden:
@@ -77,13 +77,20 @@ einen Benutzer mit Klartext-Passwort an.
 Eine `.env` im Repo-Wurzelverzeichnis muss vorhanden sein: `app.core.config` liest sie
 beim Import, auch im Test.
 
+**Eine Abkündigung lässt den Lauf scheitern.** `pytest.ini` schaltet
+`DeprecationWarning`, `PendingDeprecationWarning` und `StarletteDeprecationWarning` auf
+Fehler — Letztere muss einzeln dastehen, weil Starlette sie von `UserWarning` ableitet und
+die ersten beiden Zeilen sie nicht fassen. Ohne das steht die Warnung im Bericht und
+niemand liest sie; genau so ist zweimal veralteter Code hereingekommen. Wird das hier rot,
+gehört die neue Schreibweise in den Code — nicht die Zeile aus `pytest.ini`.
+
 | Datei | Deckt ab |
 | ----- | -------- |
 | [tests/test_auth_login.py](tests/test_auth_login.py) | Anmeldung, Token, Fehlermeldungen |
-| [tests/test_auth_authorization.py](tests/test_auth_authorization.py) | Token-Prüfung und Rollen, für **alle** Patienten-Routen auf einmal |
+| [tests/test_auth_authorization.py](tests/test_auth_authorization.py) | Token-Prüfung und Rollen, für **alle** Routen unter `/patients` auf einmal — seit die Dokumente dort hängen, sind sie mit drin |
 | [tests/test_patients_api.py](tests/test_patients_api.py) | Patienten-Endpunkte, gegliedert nach Endpunkt |
 | [tests/test_audit.py](tests/test_audit.py) | Audit-Trail, Datensparsamkeit, Missbrauchserkennung, Monitoring |
-| [tests/test_documents_api.py](tests/test_documents_api.py) | Dokumente je Patient, Dokumenttyp, Anhang (auch ohne), 20-MB-Grenze, Ablage |
+| [tests/test_documents_api.py](tests/test_documents_api.py) | Dokumente je Patient, Dokumenttyp, Anhänge (keiner/einer/mehrere), Abruf, 20-MB-Grenze, Ablage |
 | [tests/test_documents_seed.py](tests/test_documents_seed.py) | Testdokumente: gültig, alle vier Dokumenttypen, mehrfach ausführbar |
 
 Was sich gegen SQLite **nicht** prüfen lässt, steht als Kommentar im jeweiligen Testkopf.
@@ -252,19 +259,27 @@ Hier nur der Überblick:
 
 | Methode | Pfad | Zweck | Verlangt |
 | ------- | ---- | ----- | -------- |
-| `POST` | `/docs/{patient_id}` | Dokument anlegen, multipart → `201` | Token |
-| `GET` | `/docs/{patient_id}?q=&limit=&offset=` | Dokumente eines Patienten | Token |
-| `DELETE` | `/docs/{patient_id}/{document_id}` | endgültig löschen → `204` | Token + `admin` |
+| `POST` | `/patients/{id}/documents` | Dokument anlegen, multipart → `201` | Token |
+| `GET` | `/patients/{id}/documents?q=&limit=&offset=` | Dokumente eines Patienten | Token |
+| `GET` | `/patients/{id}/documents/{docId}/attachments/{aId}` | Anhang abrufen | Token |
+| `DELETE` | `/patients/{id}/documents/{docId}` | endgültig löschen → `204` | Token + `admin` |
 
 Drei Dinge, die beim Lesen des Codes sonst überraschen:
 
-- **Ein Dokument ist nicht die Datei.** Es besteht aus Angaben, deren Felder vom
-  **Dokumenttyp** abhängen (`fields`), und **optional** einem **Anhang**. Ein Dokument ohne
-  Anhang ist gültig — so steht es in [CONTEXT.md](../CONTEXT.md), und genau daran hängt auch
-  die Begründung von ADR-0002: Ohne heterogene Angaben gäbe es keinen Grund für MongoDB.
-- **`document_type` wird gegen keine Liste geprüft.** CONTEXT.md verlangt neue
-  Dokumenttypen ohne Schemaänderung; welche üblich sind, steht in der Doku, nicht im Code.
+- **Ein Dokument ist nicht die Datei.** Es besteht aus beschreibenden Angaben und
+  **beliebig vielen Anhängen** — auch keinem. Ein Befund aus drei gescannten Seiten ist
+  **ein** Dokument mit drei Anhängen ([CONTEXT.md](../CONTEXT.md)).
+- **Es gibt keine typabhängigen Felder.** Bewusst vertagt: Sie brauchen erst einen
+  Feldkatalog je Dokumenttyp, sonst entstehen drei Schlüssel für denselben Wert (`hb`,
+  `Hb`, `haemoglobin`). Begründung und Fahrplan in
+  [documents-api.md](../docs/documents-api.md#warum-es-keine-typabhängigen-felder-gibt) —
+  daran hängt auch die Begründung von ADR-0002 für MongoDB.
+- **`document_type` wird gegen keine Liste geprüft.** Neue Dokumenttypen sollen ohne
+  Schemaänderung möglich sein; welche üblich sind, steht in der Doku, nicht im Code.
   Getrimmt und kleingeschrieben wird trotzdem, sonst wären `Befund` und `befund` zwei Typen.
+- **Der Pfad liegt unter dem Patienten.** Ein Dokument ohne Patienten existiert nicht — der
+  Pfad sagt dasselbe wie das Datenmodell. Nebeneffekt: Die Absicherungstests für
+  `/patients` erfassen die Dokument-Routen automatisch mit.
 - **Zwei Speicher in einem Vorgang.** `service.create` schreibt erst die Bytes, dann die
   Angaben — und nimmt die Bytes zurück, wenn der zweite Schritt scheitert. Sonst lägen
   Anhänge auf der Platte, zu denen es kein Dokument gibt.

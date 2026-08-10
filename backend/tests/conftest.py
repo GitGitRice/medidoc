@@ -45,6 +45,13 @@ def session_fixture() -> Generator[Session, None, None]:
     with Session(engine) as session:
         yield session
 
+    # Die Verbindung gehört zum Test und muss mit ihm enden. Ohne das bleibt sie
+    # offen, bis der Garbage Collector sie irgendwann einsammelt — und meldet
+    # dabei eine `ResourceWarning`, die im Lauf als Warnung auftaucht, ohne dass
+    # jemand etwas falsch gemacht hätte. `StaticPool` hält genau eine
+    # Verbindung; `dispose` schließt sie.
+    engine.dispose()
+
 
 @pytest.fixture(name="audit_store", autouse=True)
 def audit_store_fixture() -> Generator[MemoryAuditStore, None, None]:

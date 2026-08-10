@@ -23,18 +23,26 @@ _Avoid_: Profil, Grunddaten
 
 **Dokument**:
 Ein Eintrag in der Akte eines Patienten — z. B. ein Befund oder ein Laborwert. Besteht
-immer aus strukturierten Angaben, deren Felder vom Dokumenttyp abhängen, und optional
-aus einem angehängten Anhang. Gehört immer zu genau einem Patienten.
+aus beschreibenden Angaben — Titel, Beschreibung, Schlagworte, Dokumenttyp — und aus
+beliebig vielen Anhängen. Gehört immer zu genau einem Patienten.
 _Avoid_: Datei, Upload, Eintrag
 
 **Dokumenttyp**:
-Die Art eines Dokuments — z. B. Befund, Arztbrief, Laborwert. Bestimmt, welche Felder
-das Dokument hat. Neue Dokumenttypen sollen ohne Schemaänderung möglich sein.
+Die Art eines Dokuments — z. B. Befund, Arztbrief, Laborwert. Ein Schlagwort zum Sortieren
+und Filtern. Neue Dokumenttypen sollen ohne Schemaänderung möglich sein; der Typ bestimmt
+**nicht**, welche Felder ein Dokument hat — alle Dokumente haben dieselben.
+
+Typabhängige Felder sind nicht verworfen, sondern **vertagt**: Sie setzen einen Katalog je
+Dokumenttyp voraus, der festlegt, welche Felder es gibt. Ohne ihn schriebe der eine `hb`,
+der nächste `Hb` und der dritte `haemoglobin` — drei Schlüssel für denselben Wert, und
+keine Auswertung fände sie zusammen. Erst der Katalog, dann die Felder.
 _Avoid_: Kategorie, Art, Klasse
 
 **Anhang**:
 Die eigentliche Datei zu einem Dokument, etwa ein PDF oder ein Scan. Ein Dokument kann
-höchstens einen Anhang haben; ein Dokument ohne Anhang ist gültig.
+beliebig viele Anhänge haben — ein Befund aus drei gescannten Seiten ist **ein** Dokument
+mit drei Anhängen. Ein Dokument ohne Anhang ist gültig. Jeder Anhang trägt seine eigene
+Herkunft; die Anhänge eines Dokuments können aus verschiedenen Quellen stammen.
 _Avoid_: Datei, Attachment, Upload
 
 **Benutzer**:

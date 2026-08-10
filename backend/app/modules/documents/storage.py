@@ -83,6 +83,7 @@ class FileStorage:
         stream: BinaryIO,
         patient_id: int,
         document_id: str,
+        attachment_id: str,
         filename: str | None,
         limit_bytes: int,
     ) -> StoredFile:
@@ -90,11 +91,15 @@ class FileStorage:
 
         Wirft `FileTooLarge` oder `EmptyFile` — und lässt in beiden Fällen
         nichts Halbes liegen.
+
+        Ein Ordner je Dokument, darin eine Datei je Anhang: Seit ein Dokument
+        mehrere Anhänge tragen kann, würde ein gemeinsamer Ordner sie nur über
+        den Dateinamen auseinanderhalten — und der kommt vom Aufrufer.
         """
-        folder = self.root / str(patient_id)
+        folder = self.root / str(patient_id) / document_id
         folder.mkdir(parents=True, exist_ok=True)
 
-        target = folder / f"{document_id}{safe_suffix(filename)}"
+        target = folder / f"{attachment_id}{safe_suffix(filename)}"
         # Erst unter einem Arbeitsnamen schreiben: Bricht der Upload ab, liegt
         # keine halbe Datei da, die wie eine ganze aussieht.
         partial = target.with_name(target.name + ".part")
@@ -135,6 +140,38 @@ class FileStorage:
             log.warning(
                 "documents: Datei nicht gelöscht",
                 extra={"path": relative_path},
+                exc_info=True,
+            )
+
+    def resolve(self, relative_path: str) -> Path:
+        """Der volle Pfad zu einem gespeicherten Anhang.
+
+        Nur für das Ausliefern gedacht. Der übergebene Pfad stammt aus den
+        eigenen Angaben in MongoDB, nicht vom Aufrufer — trotzdem wird geprüft,
+        dass er unterhalb der Wurzel bleibt: Ein zusammengesetzter Pfad, der aus
+        dem Wurzelverzeichnis herausführt, wäre genau die Lücke, die
+        `safe_suffix` beim Hochladen verhindert.
+        """
+        full = (self.root / relative_path).resolve()
+        if not full.is_relative_to(self.root.resolve()):
+            raise ValueError(f"Pfad liegt außerhalb der Ablage: {relative_path}")
+        return full
+
+    def delete_document_folder(self, patient_id: int, document_id: str) -> None:
+        """Räumt den Ordner eines Dokuments samt aller Anhänge ab.
+
+        Wie `delete`, nur für alle Anhänge auf einmal: Das Dokument ist beim
+        Aufruf schon aus MongoDB verschwunden, ein Fehler hier darf die Antwort
+        nicht mehr kippen.
+        """
+        try:
+            shutil.rmtree(self.root / str(patient_id) / document_id)
+        except FileNotFoundError:
+            return
+        except OSError:
+            log.warning(
+                "documents: Ordner des Dokuments nicht abgeräumt",
+                extra={"patient_id": patient_id, "document_id": document_id},
                 exc_info=True,
             )
 

@@ -1,199 +1,252 @@
 [
   {
     "id": "5eed0000000000000000000000000001",
-    "patient": "A123456789",
+    "patient_id": 1,
     "document_type": "befund",
     "title": "MRT linkes Knie",
     "description": "Anhaltende Schmerzen nach Sturz beim Sport.",
     "tags": "mrt, radiologie, knie",
-    "source": "Radiologie Mitte",
-    "fields": { "koerperregion": "Knie links", "befundet": true },
-    "attachment": { "filename": "mrt_knie_links.pdf", "content_type": "application/pdf" },
+    "attachments": [
+      {
+        "filename": "mrt_knie_links.pdf",
+        "content_type": "application/pdf",
+        "source": "Radiologie Mitte"
+      }
+    ],
     "created_at": "2026-03-12T09:20:00Z"
   },
   {
     "id": "5eed0000000000000000000000000002",
-    "patient": "A123456789",
+    "patient_id": 1,
     "document_type": "laborwert",
     "title": "Großes Blutbild",
     "description": "Routinekontrolle, keine Auffälligkeiten.",
     "tags": "labor, blutbild, routine",
-    "source": "Labor Berlin Mitte",
-    "fields": { "hb": 13.4, "einheit": "g/dl", "leukozyten": 6.8 },
+    "attachments": [],
     "created_at": "2026-04-02T07:45:00Z"
   },
   {
     "id": "5eed0000000000000000000000000003",
-    "patient": "A123456789",
+    "patient_id": 1,
     "document_type": "arztbrief",
     "title": "Arztbrief Orthopädie",
     "description": "Befundbesprechung zum MRT vom 12.03.",
     "tags": "orthopaedie, knie",
-    "source": "Orthopädische Praxis Dr. Behrens",
-    "fields": { "diagnose": "Gonarthrose links", "empfehlung": "Physiotherapie" },
-    "attachment": { "filename": "arztbrief_orthopaedie.pdf", "content_type": "application/pdf" },
+    "attachments": [
+      {
+        "filename": "arztbrief_orthopaedie.pdf",
+        "content_type": "application/pdf",
+        "source": "Orthopädische Praxis Dr. Behrens"
+      },
+      {
+        "filename": "arztbrief_orthopaedie_anlage.pdf",
+        "content_type": "application/pdf",
+        "source": "Radiologie Mitte"
+      }
+    ],
     "created_at": "2026-04-18T14:05:00Z"
   },
   {
     "id": "5eed0000000000000000000000000004",
-    "patient": "A123456789",
+    "patient_id": 1,
     "document_type": "sonstiges",
     "title": "Einverständniserklärung Datenweitergabe",
     "description": "Weitergabe der Befunde an die orthopädische Praxis.",
     "tags": "verwaltung, einwilligung",
-    "source": "Praxis",
-    "fields": { "unterschrieben": true },
-    "attachment": { "filename": "einwilligung_scan.jpg", "content_type": "image/jpeg" },
+    "attachments": [
+      {
+        "filename": "einwilligung_scan.jpg",
+        "content_type": "image/jpeg",
+        "source": "Praxis"
+      }
+    ],
     "created_at": "2026-05-06T11:30:00Z"
   },
   {
     "id": "5eed0000000000000000000000000005",
-    "patient": "A123456789",
+    "patient_id": 1,
     "document_type": "laborwert",
     "title": "Kontrolle Blutzucker",
     "description": "Nüchternwert, Verlaufskontrolle.",
     "tags": "labor, blutzucker",
-    "source": "Labor Berlin Mitte",
-    "fields": { "glukose_nuechtern": 5.6, "einheit": "mmol/l" },
+    "attachments": [],
     "created_at": "2026-07-21T08:10:00Z"
   },
   {
     "id": "5eed0000000000000000000000000006",
-    "patient": "B987654321",
+    "patient_id": 2,
     "document_type": "befund",
     "title": "Ultraschall Schilddrüse",
     "description": "Kontrolle eines bekannten Knotens im rechten Lappen.",
     "tags": "sonographie, schilddruese",
-    "source": "Praxis Dr. Neumann",
-    "fields": { "koerperregion": "Hals", "befundet": true },
-    "attachment": { "filename": "sono_schilddruese.pdf", "content_type": "application/pdf" },
+    "attachments": [
+      {
+        "filename": "sono_schilddruese.pdf",
+        "content_type": "application/pdf",
+        "source": "Praxis Dr. Neumann"
+      }
+    ],
     "created_at": "2026-02-27T10:15:00Z"
   },
   {
     "id": "5eed0000000000000000000000000007",
-    "patient": "B987654321",
+    "patient_id": 2,
     "document_type": "arztbrief",
     "title": "Entlassbrief Kardiologie",
     "description": "Stationärer Aufenthalt vom 08.06. bis 11.06.",
     "tags": "kardiologie, entlassung",
-    "source": "Herzzentrum Berlin",
-    "fields": {
-      "diagnose": "Arterielle Hypertonie",
-      "medikation": "Ramipril 5 mg",
-      "empfehlung": "Blutdruckkontrolle in zwei Wochen"
-    },
-    "attachment": { "filename": "entlassbrief_kardiologie.pdf", "content_type": "application/pdf" },
+    "attachments": [
+      {
+        "filename": "entlassbrief_kardiologie.pdf",
+        "content_type": "application/pdf",
+        "source": "Herzzentrum Berlin"
+      }
+    ],
     "created_at": "2026-06-11T16:40:00Z"
   },
   {
     "id": "5eed0000000000000000000000000008",
-    "patient": "B987654321",
+    "patient_id": 2,
     "document_type": "sonstiges",
     "title": "Telefonnotiz Rezeptwunsch",
+    "description": null,
+    "tags": null,
+    "attachments": [],
     "created_at": "2026-08-04T09:05:00Z"
   },
   {
     "id": "5eed0000000000000000000000000009",
-    "patient": "C246813579",
+    "patient_id": 3,
     "document_type": "befund",
     "title": "U11 Vorsorgeuntersuchung",
     "description": "Altersgerechte Entwicklung, keine Auffälligkeiten.",
     "tags": "vorsorge, kinderheilkunde",
-    "source": "Kinderarztpraxis am Park",
-    "fields": { "groesse_cm": 138, "gewicht_kg": 32.5, "auffaellig": false },
+    "attachments": [],
     "created_at": "2026-05-19T09:30:00Z"
   },
   {
     "id": "5eed000000000000000000000000000a",
-    "patient": "C246813579",
+    "patient_id": 3,
     "document_type": "sonstiges",
     "title": "Kopie Impfausweis",
     "description": "Von den Eltern in der Sprechstunde übergeben.",
     "tags": "impfung, verwaltung",
-    "source": "Kinderarztpraxis am Park",
-    "fields": { "vollstaendig": true },
-    "attachment": { "filename": "impfausweis.jpg", "content_type": "image/jpeg" },
+    "attachments": [
+      {
+        "filename": "impfausweis.jpg",
+        "content_type": "image/jpeg",
+        "source": "Kinderarztpraxis am Park"
+      }
+    ],
     "created_at": "2026-05-19T10:05:00Z"
   },
   {
     "id": "5eed000000000000000000000000000b",
-    "patient": "D135792468",
+    "patient_id": 4,
     "document_type": "laborwert",
     "title": "Eisenstatus",
     "description": "Abklärung bei Müdigkeit.",
     "tags": "labor, eisen",
-    "source": "Labor Berlin Mitte",
-    "fields": { "ferritin": 18, "einheit": "µg/l", "auffaellig": true },
+    "attachments": [],
     "created_at": "2026-06-30T07:55:00Z"
   },
   {
     "id": "5eed000000000000000000000000000c",
-    "patient": "D135792468",
+    "patient_id": 4,
     "document_type": "arztbrief",
     "title": "Überweisung Gastroenterologie",
     "description": "Zur weiteren Abklärung des Eisenmangels.",
     "tags": "gastroenterologie, ueberweisung",
-    "source": "Hausarztpraxis Yilmaz",
-    "fields": { "fragestellung": "Ursache des Eisenmangels" },
-    "attachment": { "filename": "ueberweisung_gastro.pdf", "content_type": "application/pdf" },
+    "attachments": [
+      {
+        "filename": "ueberweisung_gastro.pdf",
+        "content_type": "application/pdf",
+        "source": "Hausarztpraxis Yilmaz"
+      }
+    ],
     "created_at": "2026-07-02T12:20:00Z"
   },
   {
     "id": "5eed000000000000000000000000000d",
-    "patient": "P100200300",
+    "patient_id": 5,
     "document_type": "sonstiges",
     "title": "Patientenverfügung",
     "description": "Hinterlegt in der Akte, Original beim Patienten.",
     "tags": "verwaltung, vorsorge",
-    "source": "Patient",
-    "fields": { "hinterlegt": true },
-    "attachment": { "filename": "patientenverfuegung.pdf", "content_type": "application/pdf" },
+    "attachments": [
+      {
+        "filename": "patientenverfuegung.pdf",
+        "content_type": "application/pdf",
+        "source": "Patient"
+      },
+      {
+        "filename": "patientenverfuegung_seite2.pdf",
+        "content_type": "application/pdf",
+        "source": "Patient"
+      },
+      {
+        "filename": "patientenverfuegung_seite3.pdf",
+        "content_type": "application/pdf",
+        "source": "Patient"
+      }
+    ],
     "created_at": "2026-02-10T13:00:00Z"
   },
   {
     "id": "5eed000000000000000000000000000e",
-    "patient": "P100200300",
+    "patient_id": 5,
     "document_type": "befund",
     "title": "Röntgen Thorax",
     "description": "Kontrolle nach durchgemachter Pneumonie.",
     "tags": "roentgen, thorax, radiologie",
-    "source": "Radiologie Mitte",
-    "fields": { "koerperregion": "Thorax", "befundet": true },
-    "attachment": { "filename": "roentgen_thorax.pdf", "content_type": "application/pdf" },
+    "attachments": [
+      {
+        "filename": "roentgen_thorax.pdf",
+        "content_type": "application/pdf",
+        "source": "Radiologie Mitte"
+      },
+      {
+        "filename": "roentgen_thorax_seitlich.pdf",
+        "content_type": "application/pdf",
+        "source": "Radiologie Mitte"
+      }
+    ],
     "created_at": "2026-03-03T08:40:00Z"
   },
   {
     "id": "5eed000000000000000000000000000f",
-    "patient": "P100200300",
+    "patient_id": 5,
     "document_type": "arztbrief",
     "title": "Arztbrief Kardiologie",
     "description": "Verlaufskontrolle bei Vorhofflimmern.",
     "tags": "kardiologie, vorhofflimmern",
-    "source": "Herzzentrum Berlin",
-    "fields": { "diagnose": "Vorhofflimmern", "medikation": "Apixaban 5 mg" },
-    "attachment": { "filename": "arztbrief_kardiologie.pdf", "content_type": "application/pdf" },
+    "attachments": [
+      {
+        "filename": "arztbrief_kardiologie.pdf",
+        "content_type": "application/pdf",
+        "source": "Herzzentrum Berlin"
+      }
+    ],
     "created_at": "2026-04-09T15:10:00Z"
   },
   {
     "id": "5eed0000000000000000000000000010",
-    "patient": "P100200300",
+    "patient_id": 5,
     "document_type": "laborwert",
     "title": "INR-Kontrolle",
     "description": "Gerinnung im Zielbereich.",
     "tags": "labor, gerinnung",
-    "source": "Labor Berlin Mitte",
-    "fields": { "inr": 2.4, "zielbereich": "2,0-3,0" },
+    "attachments": [],
     "created_at": "2026-07-28T07:35:00Z"
   },
   {
     "id": "5eed0000000000000000000000000011",
-    "patient": "P100200301",
+    "patient_id": 6,
     "document_type": "befund",
     "title": "Hautbefund Unterarm",
     "description": "Kontrolle eines Pigmentmals, unauffällig.",
     "tags": "dermatologie",
-    "source": "Hautarztpraxis Mitte",
-    "fields": { "koerperregion": "Unterarm rechts", "befundet": true },
+    "attachments": [],
     "created_at": "2026-08-07T11:50:00Z"
   }
 ]
