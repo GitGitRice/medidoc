@@ -10,13 +10,14 @@ Gegen SQLite und den Speicher-Trail — kein Mongo nötig, siehe
 """
 
 import logging
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.logging import REDACTED, JsonFormatter, redact, request_id_var
 from app.modules.audit.events import AuditEvent, EventType, Severity
-from app.modules.audit.store import MemoryAuditStore
+from app.modules.audit.store import MemoryAuditStore, MongoAuditStore, _serialisierbar
 from app.modules.users.models import Role
 
 LOGIN = "/auth/login"
@@ -490,6 +491,45 @@ class TestAnfrageKennung:
 )
 def test_schweregrad_haengt_am_ereignistyp(event: EventType, erwartet: Severity):
     assert AuditEvent.build(event).severity is erwartet
+
+
+class TestZeitstempel:
+    """`ts` heißt in beiden Speichern dasselbe — ISO-8601 in UTC, mit `Z`."""
+
+    def test_der_trail_liest_zeitpunkte_aus_mongo_mit_zeitzone(self, fake_pymongo):
+        """Ohne `tz_aware` käme `ts` ohne Zeitzone zurück und stünde ohne `Z` da.
+
+        Sichtbar wäre das nur im Betrieb: Der Speicher-Trail gibt seine
+        Zeitpunkte unverändert zurück, samt Zeitzone. Deshalb steht hier die
+        Einstellung selbst und nicht ihre Wirkung.
+        """
+        MongoAuditStore("mongodb://mongo:27017", "medidoc", retention_days=30)
+
+        assert fake_pymongo[0].options["tz_aware"] is True
+
+    def test_ein_zeitpunkt_aus_mongo_endet_auf_z(self):
+        """`+00:00` und `Z` sind dieselbe Zeit — der Speicher-Trail schreibt `Z`.
+
+        Stünde am selben Ereignis je nach Speicher etwas anderes, müsste jeder
+        Leser des Trails beide Schreibweisen kennen. docs/logging-monitoring.md
+        zeigt `Z`.
+        """
+        moment = datetime(2026, 8, 5, 10, 45, 36, tzinfo=UTC)
+
+        serialisiert = _serialisierbar({"ts": moment})
+
+        assert serialisiert["ts"] == "2026-08-05T10:45:36Z"
+
+    def test_der_speicher_trail_schreibt_dieselbe_form(
+        self, client: TestClient, audit_store, make_user
+    ):
+        """Beide Ausführungen, dieselbe Schreibweise — der Vergleich ist der Punkt."""
+        make_user(email="anna.admin@medidoc.test", password="geheim123")
+        anmelden(client, "anna.admin@medidoc.test", "geheim123")
+
+        ts = ereignisse(audit_store, EventType.LOGIN_SUCCEEDED)[0]["ts"]
+
+        assert ts.endswith("Z")
 
 
 def test_der_trail_ist_nur_lesbar(client: TestClient, admin_headers):
