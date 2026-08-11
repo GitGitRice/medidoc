@@ -164,6 +164,134 @@
   gap: 16px;
 }
 
+.create-document-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.create-document-form-card {
+  margin-bottom: 16px;
+}
+
+.create-document-title {
+  margin: 0;
+  color: #333;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.create-document-description {
+  margin: 5px 0 0;
+  color: #777;
+  font-size: 13px;
+}
+
+.create-document-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.create-document-fields .form-label {
+  margin: 0;
+}
+
+.create-document-fields .edit-input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  font-family: inherit;
+}
+
+.create-document-wide-field {
+  grid-column: 1 / -1;
+}
+
+.create-document-textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.create-document-error {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px solid #fcc;
+  border-radius: 4px;
+  background: #fee;
+  color: #c00;
+  font-size: 14px;
+}
+
+.create-document-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.upload-btn {
+  padding: 8px 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  color: #666;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.upload-btn:hover {
+  background: #f5f5f5;
+}
+
+.upload-btn input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.selected-file {
+  min-width: 0;
+  overflow: hidden;
+  color: #777;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create-document-actions {
+  margin-left: auto;
+}
+
+@media (max-width: 768px) {
+  .create-document-card,
+  .create-document-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .create-document-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .create-document-wide-field {
+    grid-column: auto;
+  }
+
+  .create-document-actions {
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+}
+
 /* ===========================================
    Item Card
    =========================================== */
@@ -448,7 +576,7 @@
 .search-input {
   width: 100%;
   height: 44px;
-  padding: 0 16px 0 42px;
+  padding: 0 16px 0 16px;
 
   border: 1px solid #dbe2ea;
   border-radius: 10px;
@@ -490,6 +618,7 @@
 .document-actions-right {
   display: flex;
   gap: 8px;
+  margin-left: auto;
 }
 
 .document-type-badge {
