@@ -24,10 +24,10 @@ function formatDate(isoDate) {
  * Die Patiententabelle selbst — rein darstellend.
  *
  * Holt nichts nach; bekommt Daten und Seitensteuerung ausschließlich über
- * Props. `PatientActions` zeigt aktuell nur den Details-Button, ohne
- * Rollenprüfung. Der Zeilenklick navigiert direkt, genau wie der
- * Details-Button in `PatientActions` es für sich schon tut — kein
- * zusätzlicher `onRowClick` als Umweg über `Overview.jsx`.
+ * Props. `PatientActions` prüft die Rolle für Bearbeiten selbst. Der
+ * Zeilenklick navigiert direkt, genau wie der Details-Button in
+ * `PatientActions` es für sich schon tut — kein zusätzlicher `onRowClick`
+ * als Umweg über `Overview.jsx`.
  */
 export function PatientTable({
   patients,
@@ -36,6 +36,7 @@ export function PatientTable({
   rowsPerPage,
   onPageChange,
   onRowsPerPageChange,
+  onEditClick,
 }) {
   const navigate = useNavigate();
 
@@ -72,7 +73,7 @@ export function PatientTable({
                 <TableCell>{formatDate(patient.date_of_birth)}</TableCell>
                 <TableCell>{patient.insurance_number ?? "–"}</TableCell>
                 <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                  <PatientActions patient={patient} />
+                  <PatientActions patient={patient} onEditClick={onEditClick} />
                 </TableCell>
               </TableRow>
             ))}

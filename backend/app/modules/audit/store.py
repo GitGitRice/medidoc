@@ -101,6 +101,12 @@ class MongoAuditStore:
 
         self._client: Any = MongoClient(
             url,
+            # Zeitpunkte kommen mit Zeitzone zurück. Ohne das wäre `ts` beim
+            # Lesen aus Mongo ein `datetime` ohne `tzinfo` und stünde in der
+            # Antwort ohne `Z` — anders als beim Speicher-Trail, der dasselbe
+            # Ereignis mit `Z` ausliefert. Ein Trail, dessen Zeitstempel je nach
+            # Speicher anders zu lesen ist, taugt nicht als Beleg.
+            tz_aware=True,
             # Kurz halten: Wenn Mongo weg ist, soll ein Request nicht sekundenlang
             # hängen, nur weil sein Protokolleintrag nicht wegkommt.
             serverSelectionTimeoutMS=2000,
@@ -188,9 +194,15 @@ class MongoAuditStore:
 
 
 def _serialisierbar(dokument: dict[str, Any]) -> dict[str, Any]:
-    """`datetime` aus Mongo in ISO-Text, damit FastAPI es ohne Umweg ausgibt."""
+    """`datetime` aus Mongo in ISO-Text, damit FastAPI es ohne Umweg ausgibt.
+
+    `Z` und nicht `+00:00`: Beides ist dieselbe Zeit und gültiges ISO-8601, aber
+    der Speicher-Trail geht durch Pydantic und schreibt `Z`. Stünde hier das
+    andere, hiesse derselbe Zeitpunkt je nach Speicher anders — und
+    docs/logging-monitoring.md zeigt `Z`.
+    """
     if isinstance(dokument.get("ts"), datetime):
-        dokument["ts"] = dokument["ts"].isoformat()
+        dokument["ts"] = dokument["ts"].isoformat().replace("+00:00", "Z")
     return dokument
 
 

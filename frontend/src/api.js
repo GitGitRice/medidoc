@@ -12,10 +12,14 @@ const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replac
 );
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, errors = null) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    // Ein Eintrag pro beanstandetem Feld bei `422` (app/core/errors.py),
+    // sonst `null` — Formulare koennen so gezielt an einzelnen Feldern
+    // eine Meldung zeigen, statt nur den zusammengefassten Text.
+    this.errors = errors;
   }
 }
 
@@ -74,6 +78,21 @@ function errorMessage(body, status) {
 }
 
 /**
+ * Die feldbezogenen Meldungen aus einer `422`-Antwort, oder `null`.
+ *
+ * `errors` kommt nur bei `422` und nur von unserem eigenen Handler
+ * (app/core/errors.py) — ein Eintrag pro beanstandetem Feld mit `field` und
+ * `message`.
+ */
+function fieldErrors(body) {
+  if (typeof body === "object" && Array.isArray(body?.errors)) {
+    return body.errors;
+  }
+
+  return null;
+}
+
+/**
  * Ein Request gegen die API. `token` wird, wenn gesetzt, als Bearer-Header
  * mitgeschickt — damit kein Aufrufer den Header selbst zusammenbaut.
  */
@@ -100,7 +119,11 @@ export async function apiRequest(path, { token, headers, ...options } = {}) {
   const body = await readResponse(response);
 
   if (!response.ok) {
-    throw new ApiError(errorMessage(body, response.status), response.status);
+    throw new ApiError(
+      errorMessage(body, response.status),
+      response.status,
+      fieldErrors(body),
+    );
   }
 
   return body;
@@ -118,9 +141,20 @@ export function getCurrentUser(token, options = {}) {
   return apiRequest("/auth/me", { ...options, token });
 }
 
-/** Hängt `limit` und `offset` an einen Pfad, soweit gesetzt. */
-function withPaging(path, { limit, offset } = {}) {
+/**
+ * Hängt Suche und Seitengröße an einen Pfad, soweit gesetzt.
+ *
+ * Eine Stelle für alle Listen: `q`, `limit` und `offset` heißen bei Patienten,
+ * Benutzern und Dokumenten gleich (docs/patients-api.md,
+ * docs/documents-api.md). Eine leere Suche wird weggelassen und nicht als
+ * `q=` geschickt — das Backend liest beides gleich, in der Adresszeile steht
+ * sonst ein Filter, der keiner ist.
+ */
+function withQuery(path, { q, limit, offset } = {}) {
   const params = new URLSearchParams();
+  if (q) {
+    params.set("q", q);
+  }
   if (limit != null) {
     params.set("limit", limit);
   }
@@ -136,20 +170,24 @@ function withPaging(path, { limit, offset } = {}) {
  * Der Pfad für `GET /patients`, mit Suche und Seitengröße.
  */
 export function patientsPath({ q, limit, offset } = {}) {
-  const params = new URLSearchParams();
-  if (q) {
-    params.set("q", q);
-  }
-  if (limit != null) {
-    params.set("limit", limit);
-  }
-  if (offset != null) {
-    params.set("offset", offset);
-  }
-
-  const query = params.toString();
-  return query ? `/patients?${query}` : "/patients";
+  return withQuery("/patients", { q, limit, offset });
 }
+
+/** Der Pfad für `GET /patients/{id}` — ein einzelner Patient mit allen Feldern. */
+export function patientPath(patientId) {
+  return `/patients/${patientId}`;
+}
+
+/**
+ * Der Pfad für `GET /docs/{patient_id}` — die Dokumente eines Patienten.
+ *
+ * `q` filtert nach **Titel und Beschreibung**, nicht nach Tags oder
+ * Dokumenttyp (docs/documents-api.md).
+ */
+export function documentsPath(patientId, { q, limit, offset } = {}) {
+  return withQuery(`/docs/${patientId}`, { q, limit, offset });
+}
+
 
 /**
  * Der Pfad für `GET /users` und `POST /users` — nur für `admin`.
@@ -158,7 +196,7 @@ export function patientsPath({ q, limit, offset } = {}) {
  * `is_active`.
  */
 export function usersPath({ limit, offset } = {}) {
-  return withPaging("/users", { limit, offset });
+  return withQuery("/users", { limit, offset });
 }
 
 /** Der Pfad für `PATCH /users/{id}`. */

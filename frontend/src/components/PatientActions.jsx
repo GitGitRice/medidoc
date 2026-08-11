@@ -2,15 +2,19 @@ import { useNavigate } from "react-router-dom";
 import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
+import { useAuth } from "../auth/AuthContext.jsx";
+
 /**
- * Die Aktionen-Zelle einer Patientenzeile.
+ * Die Aktionen-Zelle einer Patientenzeile: Details und Bearbeiten.
  *
- * Aktuell nur Details — jeder angemeldete Benutzer darf Patientendaten
- * einsehen (ADR-0005). Bearbeiten und Löschen kommen mit #21/#22 dazu.
+ * Rollen laut ADR-0005: Details sieht jeder angemeldete Benutzer, Bearbeiten
+ * `staff` und `admin` (Stammdaten pflegen). Löschen kommt mit #22 dazu.
  */
-export function PatientActions({ patient }) {
+export function PatientActions({ patient, onEditClick }) {
+  const { hasRole } = useAuth();
   const navigate = useNavigate();
 
   // `justifyContent` gehoert in `sx`: Als eigene Prop nimmt `Stack` es in
@@ -29,6 +33,21 @@ export function PatientActions({ patient }) {
           <VisibilityOutlinedIcon fontSize="small" />
         </IconButton>
       </Tooltip>
+
+      {hasRole("admin", "staff") && (
+        <Tooltip title="Patient bearbeiten">
+          <IconButton
+            size="small"
+            aria-label="Patient bearbeiten"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEditClick(patient);
+            }}
+          >
+            <EditOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
     </Stack>
   );
 }

@@ -90,6 +90,53 @@ def documents_fixture(upload_dir) -> Generator[MemoryDocumentStore, None, None]:
     set_storage(None)
 
 
+class FakeMongoClient:
+    """Ein `MongoClient`, der sich nur merkt, wie er gebaut wurde.
+
+    Genug, damit `MongoDocumentStore` und `MongoAuditStore` sich anlegen lassen:
+    `client[datenbank][collection]` muss etwas liefern, auf dem `create_index`
+    aufgerufen werden darf.
+    """
+
+    def __init__(self, url: str, **options: object) -> None:
+        self.url = url
+        self.options = options
+
+    def __getitem__(self, _name: str) -> "FakeMongoClient":
+        return self
+
+    def create_index(self, *_args: object, **_kwargs: object) -> None:
+        return None
+
+
+@pytest.fixture(name="fake_pymongo")
+def fake_pymongo_fixture(monkeypatch):
+    """Schiebt `pymongo` ein Doppel unter und gibt den gebauten Client zurück.
+
+    Die Mongo-Speicher lassen sich sonst gar nicht prüfen: Die Tests laufen
+    ohne Datenbank, und `pymongo` muss dafür nicht einmal installiert sein.
+    Was hier geprüft wird, ist nicht der Datenbankzugriff, sondern **wie die
+    Verbindung eingestellt ist** — und das entscheidet sich beim Bauen.
+    """
+    import sys
+    import types
+
+    gebaut: list[FakeMongoClient] = []
+
+    def build(url: str, **options: object) -> FakeMongoClient:
+        client = FakeMongoClient(url, **options)
+        gebaut.append(client)
+        return client
+
+    modul = types.ModuleType("pymongo")
+    modul.MongoClient = build
+    modul.ASCENDING = 1
+    modul.DESCENDING = -1
+    monkeypatch.setitem(sys.modules, "pymongo", modul)
+
+    return gebaut
+
+
 @pytest.fixture(name="client")
 def client_fixture(session: Session) -> Generator[TestClient, None, None]:
     """Ein Client, dessen Requests auf derselben Session arbeiten wie der Test."""

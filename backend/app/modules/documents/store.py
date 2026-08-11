@@ -140,6 +140,16 @@ class MongoDocumentStore:
 
         self._client: Any = MongoClient(
             url,
+            # BSON speichert einen Zeitpunkt als Millisekunden seit Epoch — in
+            # UTC, aber **ohne** die Zonenangabe selbst. Ohne `tz_aware` gibt
+            # pymongo ihn deshalb ohne `tzinfo` zurück, und aus dem `created_at`
+            # eines Dokuments wird in der Antwort "2026-07-21T08:10:00" statt
+            # "2026-07-21T08:10:00Z". Der Zeitpunkt stimmt, die Auskunft fehlt —
+            # und ein Browser liest einen Zeitstempel ohne Offset als **lokale**
+            # Zeit. Ein Dokument von 23:30 UTC stünde damit im Frontend unter
+            # dem Vortag. docs/documents-api.md sagt UTC, also kommt es auch so
+            # heraus.
+            tz_aware=True,
             serverSelectionTimeoutMS=5000,
             connectTimeoutMS=5000,
         )
