@@ -14,9 +14,7 @@ lokale Start mit `docker compose up` bleibt unverändert.
 AWS-Konsole. Sie werden bewusst nicht im öffentlichen Repository festgeschrieben:
 Nach dem Freigeben und späteren Neuzuweisen der Elastic IP wären beide Angaben
 veraltet. Solange dieselbe Elastic IP mit der Instanz verbunden bleibt, bleiben IP
-und DNS-Name auch nach einem Stoppen und erneuten Starten gleich. Die Adresse wird
-berechnet, solange sie im AWS-Konto reserviert ist, und muss nach Projektende wieder
-freigegeben werden.
+und DNS-Name auch nach einem Stoppen und erneuten Starten gleich.
 
 ## Architektur
 
@@ -136,7 +134,7 @@ kannte, müssen in `/opt/medidoc/.env` diese drei Werte aktualisiert werden:
 ```dotenv
 CORS_ORIGINS=http://NEUER_EC2_DNS_NAME:5173,http://NEUE_ELASTIC_IP:5173
 VITE_API_URL=http://NEUER_EC2_DNS_NAME:8000
-VITE_ALLOWED_HOST=NEUER_EC2_DNS_NAME
+VITE_ALLOWED_HOSTS=NEUER_EC2_DNS_NAME
 ```
 
 Datei über Session Manager bearbeiten und nur API und Frontend neu erstellen:
@@ -178,14 +176,16 @@ User Data ausgeführt. Das Skript:
 1. aktualisiert Amazon Linux und installiert Docker sowie Git,
 2. installiert kompatible Versionen von Docker Compose und Buildx,
 3. richtet wegen des kleinen Arbeitsspeichers 2 GiB Swap ein,
-4. klont den Branch `develop` nach `/opt/medidoc`,
-5. erzeugt zufällige Datenbank-, JWT- und Demo-Passwörter,
-6. bindet beide Datenbankports nur an die lokale Schnittstelle,
-7. startet alle Services und legt 25 erfundene Testpatienten an.
+4. klont den vorführbaren Branch `main` nach `/opt/medidoc`,
+5. erzeugt `.env` aus `.env.example` und überschreibt nur die AWS-spezifischen Werte,
+6. erzeugt zufällige Datenbank-, JWT- und Demo-Passwörter,
+7. bindet beide Datenbankports nur an die lokale Schnittstelle,
+8. startet alle Services und legt 25 erfundene Testpatienten an.
 
-`develop` ist hier bewusst ein beweglicher Stand, damit die Demo über den unten
-beschriebenen Betriebsablauf aktualisiert werden kann. Für ein unveränderliches
-Release muss `GIT_REF` im Bootstrap auf einen Tag oder Commit-SHA zeigen.
+`main` ist gemäß [ADR-0006](./adr/0006-gitflow-als-branching-modell.md) der
+vorführbare Stand. `GIT_REF` kann vor dem Aufruf des Bootstrap-Skripts auf einen Tag
+oder Commit-SHA gesetzt werden, wenn ein unveränderliches Release gestartet werden
+soll.
 
 Der Bootstrap ist ausschließlich für die Ersteinrichtung gedacht. Existiert bereits
 `/opt/medidoc/.env`, bricht er ab, bevor Repository oder Zugangsdaten überschrieben
@@ -209,11 +209,11 @@ sudo docker compose ps
 sudo docker compose logs --tail=100
 ```
 
-Den Stand von `develop` aktualisieren und neu bauen:
+Den vorführbaren Stand von `main` aktualisieren und neu bauen:
 
 ```bash
 cd /opt/medidoc
-sudo git pull --ff-only origin develop
+sudo git pull --ff-only origin main
 sudo docker compose up -d --build
 sudo docker compose exec -T fastapi python -m app.seed --patients 25
 ```
@@ -231,7 +231,7 @@ gebraucht werden.
 
 ## Ressourcen nach Projektende entfernen
 
-Die Reihenfolge ist wichtig, damit keine Elastic IP unbemerkt weiterberechnet wird:
+Die Reihenfolge ist wichtig, damit die reservierte Elastic IP sicher freigegeben wird:
 
 1. Unter **EC2 → Elastic IP addresses** `medidoc-demo-eip` auswählen.
 2. **Actions → Disassociate Elastic IP address** ausführen.
@@ -241,9 +241,8 @@ Die Reihenfolge ist wichtig, damit keine Elastic IP unbemerkt weiterberechnet wi
 6. Die Security Group `medidoc-demo-sg` löschen, wenn sie nicht mehr verwendet wird.
 7. Die Rolle `EC2-SSM-Role` nur löschen, wenn sie keine andere Instanz benötigt.
 
-**Stoppen** beendet lediglich die Rechenkosten der Instanz; EBS-Speicher und eine
-reservierte Elastic IP bleiben bestehen. **Terminieren** entfernt die Instanz und das
-als `Delete on termination` konfigurierte Root-Volume endgültig.
+**Stoppen** lässt Instanz und EBS-Volume bestehen. **Terminieren** entfernt die Instanz
+und das als `Delete on termination` konfigurierte Root-Volume endgültig.
 
 ## Grenzen des Demo-Deployments
 
