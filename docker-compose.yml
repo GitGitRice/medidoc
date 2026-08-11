@@ -15,6 +15,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    restart: unless-stopped
   mongo:
     image: mongo:7
     environment:
@@ -29,6 +30,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    restart: unless-stopped
 
   fastapi:
     build:
@@ -73,8 +75,8 @@ services:
       # Die URL wird im Browser aufgerufen; dort ist der Compose-Servicename unbekannt.
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
       # Vite blockiert unbekannte Host-Header. Lokal bleibt localhost erlaubt; auf AWS
-      # wird hier der öffentliche EC2-DNS-Name explizit gesetzt.
-      VITE_ALLOWED_HOST: ${VITE_ALLOWED_HOST:-localhost}
+      # wird hier der oeffentliche EC2-DNS-Name explizit gesetzt.
+      VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-localhost}
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
