@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 
+import { useAuth } from "../auth/AuthContext";
 import DeleteConfirmDialog from "./dialogs/DeleteConfirmDialog";
 
 function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit, onUpdateDocument }) {
+  const { hasRole } = useAuth();
+  const canDelete = hasRole("admin");
   
   function normalizeTags(tags) {
     if (Array.isArray(tags)) {
@@ -22,18 +24,22 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
 
   const normalizedTags = normalizeTags(document.tags);
 
+  const [editDocumentType, setEditDocumentType] = useState(document.document_type || '');
   const [editTitle, setEditTitle] = useState(document.title || '');
   const [editDescription, setEditDescription] = useState(document.description || '');
   const [editTags, setEditTags] = useState(normalizedTags.join(", "));
+  const [editSource, setEditSource] = useState(document.source || '');
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   
 
   // Wenn Item sich ändert, Formular-Werte aktualisieren
   useEffect(() => {
+    setEditDocumentType(document.document_type || '');
     setEditTitle(document.title);
     setEditDescription(document.description || '');
     setEditTags(normalizedTags.join(", "));
+    setEditSource(document.source || '');
   }, [document]);
 
   //Dialog Handler
@@ -54,17 +60,19 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
 
   // Save Handler
   function handleSave() {
-    if (editTitle.trim() === '') return;
+    if (editDocumentType.trim() === '' || editTitle.trim() === '') return;
 
     const tags = editTags
       .split(',')
       .map(tag => tag.trim().toLowerCase())
       .filter(tag => tag !== '');
 
-    onUpdateDocument(document.id, document.patientId, {
+    onUpdateDocument(document.id, document.patient_id, {
+      document_type: editDocumentType.trim().toLowerCase(),
       title: editTitle.trim(),
       description: editDescription.trim(),
-      tags: tags
+      tags,
+      source: editSource.trim() || null,
     });
   }
   
@@ -84,45 +92,79 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
 
   if (isEditing) {
     return (
-      <article className="item-card">
-        <div className="edit-form">
-          <input
-            type="text"
-            className="edit-input"
-            placeholder="Titel"
-            value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
-            autotags
-          />
-          <input
-            type="text"
-            className="edit-input"
-            placeholder="Beschreibung (optional)"
-            value={editDescription}
-            onChange={(e) => setEditDescription(e.target.value)}
-          />
-          <input
-            type="text"
-            className="edit-input"
-            placeholder="Tags (kommagetrennt)"
-            value={editTags}
-            onChange={(e) => setEditTags(e.target.value)}
-          />
-          <div className="edit-actions">
+      <article className="item-card create-document-form-card">
+        <form onSubmit={(event) => { event.preventDefault(); handleSave(); }}>
+          <h2 className="create-document-title">Dokument bearbeiten</h2>
+
+          <div className="create-document-fields">
+            <label className="form-label">
+              Titel <span className="required">*</span>
+              <input
+                className="edit-input"
+                required
+                autoFocus
+                value={editTitle}
+                onChange={(event) => setEditTitle(event.target.value)}
+              />
+            </label>
+            <label className="form-label">
+              Dokumenttyp <span className="required">*</span>
+              <input
+                className="edit-input"
+                required
+                value={editDocumentType}
+                onChange={(event) => setEditDocumentType(event.target.value)}
+              />
+            </label>
+            <label className="form-label create-document-wide-field">
+              Beschreibung <span className="optional">(optional)</span>
+              <textarea
+                className="edit-input create-document-textarea"
+                value={editDescription}
+                onChange={(event) => setEditDescription(event.target.value)}
+              />
+            </label>
+            <label className="form-label">
+              Tags <span className="optional">(optional)</span>
+              <input
+                className="edit-input"
+                value={editTags}
+                onChange={(event) => setEditTags(event.target.value)}
+                placeholder="z. B. mrt, radiologie"
+              />
+            </label>
+            <label className="form-label">
+              Quelle <span className="optional">(optional)</span>
+              <input
+                className="edit-input"
+                value={editSource}
+                onChange={(event) => setEditSource(event.target.value)}
+                placeholder="z. B. Radiologie Mitte"
+              />
+            </label>
+          </div>
+
+          <div className="create-document-footer">
+            <span className="selected-file">
+              Der vorhandene Anhang bleibt unverändert.
+            </span>
+            <div className="edit-actions create-document-actions">
             <button
+              type="button"
               className="edit-btn edit-btn--cancel"
               onClick={onCancelEdit}
             >
               Abbrechen
             </button>
             <button
+              type="submit"
               className="edit-btn edit-btn--save"
-              onClick={handleSave}
             >
               Speichern
             </button>
+            </div>
           </div>
-        </div>
+        </form>
       </article>
     );
   }
@@ -188,22 +230,26 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
               Bearbeiten
             </button>
           
-            <button  
-              className="delete-btn" 
-              onClick={() => handleDeleteClick()}
-            >
-              Löschen
-            </button>
+            {canDelete && (
+              <button
+                className="delete-btn"
+                onClick={handleDeleteClick}
+              >
+                Löschen
+              </button>
+            )}
           </div>
         </div>
 
-        <DeleteConfirmDialog
-          open={deleteDialogOpen}
-          title="Dokument löschen?"
-          message={`Möchtest du "${document.title}" wirklich löschen?`}
-          onCancel={handleCancelDelete}
-          onConfirm={handleConfirmDelete}
-        />
+        {canDelete && (
+          <DeleteConfirmDialog
+            open={deleteDialogOpen}
+            title="Dokument löschen?"
+            message={`Möchtest du "${document.title}" wirklich löschen?`}
+            onCancel={handleCancelDelete}
+            onConfirm={handleConfirmDelete}
+          />
+        )}
 
       </div>
     </article>
