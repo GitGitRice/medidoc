@@ -5,10 +5,9 @@ set -Eeuo pipefail
 exec > >(tee /var/log/medidoc-bootstrap.log) 2>&1
 
 REPOSITORY_URL="https://github.com/GitGitRice/medidoc.git"
-# Der bewegliche Branch ist fuer die Demo beabsichtigt: So kann der dokumentierte
-# Betriebsablauf neue Stände mit `git pull` einspielen. Release-Deployments sollten
-# GIT_REF stattdessen auf einen Tag oder Commit-SHA festsetzen.
-GIT_REF="develop"
+# main ist laut ADR-0006 der vorfuehrbare Stand. Fuer ein unveraenderliches Release
+# kann GIT_REF vor dem Aufruf stattdessen auf einen Tag oder Commit-SHA gesetzt werden.
+GIT_REF="${GIT_REF:-main}"
 APP_DIR="/opt/medidoc"
 COMPOSE_VERSION="v5.1.2"
 BUILDX_VERSION="v0.17.1"
@@ -55,7 +54,8 @@ fi
 grep -q '^/swapfile ' /etc/fstab || echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
 
 rm -rf "${APP_DIR}"
-git clone --branch "${GIT_REF}" --single-branch "${REPOSITORY_URL}" "${APP_DIR}"
+git clone "${REPOSITORY_URL}" "${APP_DIR}"
+git -C "${APP_DIR}" checkout "${GIT_REF}"
 cd "${APP_DIR}"
 
 IMDS_TOKEN="$(curl -fsS -X PUT \
@@ -74,34 +74,32 @@ ADMIN_PASSWORD="$(openssl rand -hex 12)"
 STAFF_PASSWORD="$(openssl rand -hex 12)"
 
 umask 077
-cat > .env <<EOF
-POSTGRES_DB=${POSTGRES_DB}
-POSTGRES_USER=${POSTGRES_USER}
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-POSTGRES_PORT=5432
-DB_BIND_IP=127.0.0.1
-JWT_SECRET=${JWT_SECRET}
-SEED_ADMIN_EMAIL=anna.admin@medidoc.test
-SEED_ADMIN_PASSWORD=${ADMIN_PASSWORD}
-SEED_STAFF_EMAIL=tom.staff@medidoc.test
-SEED_STAFF_PASSWORD=${STAFF_PASSWORD}
-CORS_ORIGINS=http://${PUBLIC_HOSTNAME}:5173,http://${PUBLIC_IPV4}:5173
-VITE_API_URL=http://${PUBLIC_HOSTNAME}:8000
-VITE_ALLOWED_HOST=${PUBLIC_HOSTNAME}
-FRONTEND_PORT=5173
-LOG_LEVEL=INFO
-LOG_JSON=true
-MONGO_URL=
-MONGO_DB=medidoc
-MONGO_DB_PORT=27017
-AUDIT_RETENTION_DAYS=30
-ABUSE_WINDOW_MINUTES=15
-ABUSE_FAILED_LOGINS_PER_EMAIL=5
-ABUSE_FAILED_LOGINS_PER_IP=10
-ABUSE_REJECTED_TOKENS_PER_IP=10
-ABUSE_FORBIDDEN_PER_USER=3
-ABUSE_NOT_FOUND_PER_USER=20
-EOF
+cp .env.example .env
+
+set_env() {
+  local key="$1"
+  local value="$2"
+
+  if grep -q "^${key}=" .env; then
+    sed -i "s|^${key}=.*$|${key}=${value}|" .env
+  else
+    printf '%s=%s\n' "${key}" "${value}" >> .env
+  fi
+}
+
+set_env POSTGRES_DB "${POSTGRES_DB}"
+set_env POSTGRES_USER "${POSTGRES_USER}"
+set_env POSTGRES_PASSWORD "${POSTGRES_PASSWORD}"
+set_env DB_BIND_IP "127.0.0.1"
+set_env JWT_SECRET "${JWT_SECRET}"
+set_env SEED_ADMIN_EMAIL "anna.admin@medidoc.test"
+set_env SEED_ADMIN_PASSWORD "${ADMIN_PASSWORD}"
+set_env SEED_STAFF_EMAIL "tom.staff@medidoc.test"
+set_env SEED_STAFF_PASSWORD "${STAFF_PASSWORD}"
+set_env CORS_ORIGINS "http://${PUBLIC_HOSTNAME}:5173,http://${PUBLIC_IPV4}:5173"
+set_env VITE_API_URL "http://${PUBLIC_HOSTNAME}:8000"
+set_env VITE_ALLOWED_HOSTS "${PUBLIC_HOSTNAME}"
+set_env LOG_JSON "true"
 
 cat > /home/ec2-user/medidoc-demo-login.txt <<EOF
 MediDoc URL: http://${PUBLIC_HOSTNAME}:5173
@@ -113,19 +111,7 @@ EOF
 chown ec2-user:ec2-user /home/ec2-user/medidoc-demo-login.txt
 chmod 0600 /home/ec2-user/medidoc-demo-login.txt
 
-docker compose up -d --build
-
-for attempt in {1..30}; do
-  if docker compose exec -T postgres \
-    pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"; then
-    break
-  fi
-  if [[ "${attempt}" -eq 30 ]]; then
-    echo "PostgreSQL did not become ready" >&2
-    exit 1
-  fi
-  sleep 5
-done
+docker compose up -d --build --wait --wait-timeout 150
 
 docker compose exec -T fastapi python -m app.seed --patients 25
 
