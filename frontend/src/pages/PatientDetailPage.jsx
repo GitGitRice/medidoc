@@ -241,7 +241,6 @@ export function PatientDetailPage() {
         {actionError && <Alert severity="error">{actionError.message}</Alert>}
 
         <div className="search-box">
-          <span className="search-icon">⌕</span>
 
           <input
             type="text"
