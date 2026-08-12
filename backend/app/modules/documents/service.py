@@ -21,6 +21,8 @@ from app.modules.documents.schemas import (
     Attachment,
     DocumentMetadata,
     DocumentPublic,
+    DocumentUpdate,
+    parse_tags,
 )
 from app.modules.documents.storage import get_storage
 from app.modules.documents.store import get_store
@@ -32,6 +34,22 @@ log = logging.getLogger(__name__)
 # Ein Patient hat ein paar Dutzend Dokumente, nicht ein paar Tausend — die
 # Liste zeigt sie ohne Blättern, und der Deckel greift nur im Ausreißerfall.
 MAX_LIMIT = 100
+
+
+def _now() -> datetime:
+    """Der aktuelle Zeitpunkt, auf Millisekunden gekürzt.
+
+    BSON speichert einen Zeitpunkt als Millisekunden seit Epoch — Mikrosekunden
+    gehen beim Schreiben verloren. Ohne das Kürzen gäbe `POST` einen
+    `created_at` mit Mikrosekunden zurück, und jeder spätere Aufruf lieferte für
+    dasselbe Dokument einen anderen Wert. Ein Frontend, das den Zeitpunkt aus
+    der Anlege-Antwort behält und später vergleicht, fände nie eine
+    Übereinstimmung.
+
+    Also lieber von vornherein die Genauigkeit ausliefern, die auch ankommt.
+    """
+    now = datetime.now(UTC)
+    return now.replace(microsecond=(now.microsecond // 1000) * 1000)
 
 
 def create(
@@ -79,7 +97,7 @@ def create(
         "source": metadata.source,
         "fields": metadata.fields,
         "attachment": attachment,
-        "created_at": datetime.now(UTC),
+        "created_at": _now(),
         "created_by": created_by,
     }
 
@@ -114,6 +132,33 @@ def search(
 
     matches, total = get_store().search(patient_id, q, limit, offset)
     return [to_public(d) for d in matches], total
+
+
+def update(
+    patient_id: int, document_id: str, data: DocumentUpdate
+) -> DocumentPublic | None:
+    """Ändert die Angaben eines Dokuments. `None`, wenn es das nicht gibt.
+
+    `exclude_unset` ist hier der entscheidende Teil: Ohne das würden alle nicht
+    geschickten Felder mit ihrem Vorgabewert `None` überschrieben — ein `PATCH`
+    mit einem Feld leerte den Rest des Dokuments.
+
+    Der Anhang wird nicht angefasst. Er reist nicht durch JSON, und ihn
+    auszutauschen wäre kein Ändern der Angaben, sondern ein neuer Anhang.
+    """
+    changes: dict[str, Any] = data.model_dump(exclude_unset=True)
+
+    # Die Schlagworte kommen kommagetrennt herein wie im Formular.
+    if "tags" in changes:
+        changes["tags"] = parse_tags(changes["tags"])
+
+    # Auch ein `PATCH` ohne ein einziges Feld ist gültig — er ändert dann nur
+    # den Zeitstempel. Der gehört trotzdem gesetzt: Die Antwort behauptet
+    # sonst, das Dokument sei nie angefasst worden.
+    changes["updated_at"] = _now()
+
+    document = get_store().update(patient_id, document_id, changes)
+    return to_public(document) if document else None
 
 
 def delete(patient_id: int, document_id: str) -> bool:
@@ -184,4 +229,5 @@ def to_public(document: dict[str, Any]) -> DocumentPublic:
             else None
         ),
         created_at=document["created_at"],
+        updated_at=document.get("updated_at"),
     )

@@ -254,6 +254,7 @@ Hier nur der Überblick:
 | ------- | ---- | ----- | -------- |
 | `POST` | `/docs/{patient_id}` | Dokument anlegen, multipart → `201` | Token |
 | `GET` | `/docs/{patient_id}?q=&limit=&offset=` | Dokumente eines Patienten | Token |
+| `PATCH` | `/docs/{patient_id}/{document_id}` | Angaben ändern, JSON → `200` | Token |
 | `DELETE` | `/docs/{patient_id}/{document_id}` | endgültig löschen → `204` | Token + `admin` |
 
 Drei Dinge, die beim Lesen des Codes sonst überraschen:
@@ -265,6 +266,8 @@ Drei Dinge, die beim Lesen des Codes sonst überraschen:
 - **`document_type` wird gegen keine Liste geprüft.** CONTEXT.md verlangt neue
   Dokumenttypen ohne Schemaänderung; welche üblich sind, steht in der Doku, nicht im Code.
   Getrimmt und kleingeschrieben wird trotzdem, sonst wären `Befund` und `befund` zwei Typen.
+- **Anlegen ist multipart, Ändern ist JSON.** Beim Anlegen reist ein Anhang mit, deshalb
+  ein Formular; `PATCH` ändert nur Angaben, und dafür ist JSON die natürliche Form.
 - **Zwei Speicher in einem Vorgang.** `service.create` schreibt erst die Bytes, dann die
   Angaben — und nimmt die Bytes zurück, wenn der zweite Schritt scheitert. Sonst lägen
   Anhänge auf der Platte, zu denen es kein Dokument gibt.
