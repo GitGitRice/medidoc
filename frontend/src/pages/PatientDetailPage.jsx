@@ -7,7 +7,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 
-import { documentsPath, patientPath } from "../api.js";
+import { documentPath, documentsPath, jsonBody, patientPath } from "../api.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { CreateDocumentCard } from "../components/CreateDocumentCard.jsx";
 import DeleteConfirmDialog from "../components/dialogs/DeleteConfirmDialog";
@@ -45,6 +45,7 @@ export function PatientDetailPage() {
 
   const [searchTextDocuments, setSearchTextDocuments] = useState("");
   const [editingId, setEditingId] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
   // Eigener Zustand fuer das Loeschen (Issue #22) — getrennt vom Lade-Fehler
   // oben: Ein gescheitertes Loeschen soll die geladene Akte nicht durch eine
@@ -104,14 +105,32 @@ export function PatientDetailPage() {
     setDocuments((current) => [createdDocument, ...current]);
   }
 
-  /** Wie beim Löschen: bis auf Weiteres nur in der Anzeige (Issue #78). */
-  function handleUpdateDocument(id, _patientId, changes) {
-    setDocuments((current) =>
-      current.map((document) =>
-        document.id === id ? { ...document, ...changes } : document,
-      ),
-    );
-    setEditingId(null);
+  /** Speichert die geänderten Angaben dauerhaft über den Dokument-PATCH. */
+  async function handleUpdateDocument(id, _patientId, changes) {
+    try {
+      setActionError(null);
+      const updatedDocument = await apiFetch(
+        documentPath(patientId, id),
+        jsonBody("PATCH", {
+          document_type: changes.document_type,
+          title: changes.title,
+          description: changes.description,
+          tags: Array.isArray(changes.tags)
+            ? changes.tags.join(", ")
+            : changes.tags,
+          source: changes.source,
+        }),
+      );
+
+      setDocuments((current) =>
+        current.map((document) =>
+          document.id === id ? updatedDocument : document,
+        ),
+      );
+      setEditingId(null);
+    } catch (updateError) {
+      setActionError(updateError);
+    }
   }
 
   function handleStartEdit(id) {
@@ -219,8 +238,9 @@ export function PatientDetailPage() {
       </aside>
 
       <section className="app-content">
+        {actionError && <Alert severity="error">{actionError.message}</Alert>}
+
         <div className="search-box">
-          <span className="search-icon">⌕</span>
 
           <input
             type="text"

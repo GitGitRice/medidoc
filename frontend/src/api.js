@@ -188,6 +188,11 @@ export function documentsPath(patientId, { q, limit, offset } = {}) {
   return withQuery(`/docs/${patientId}`, { q, limit, offset });
 }
 
+/** Der Pfad für ein einzelnes Dokument — z. B. für `PATCH` und `DELETE`. */
+export function documentPath(patientId, documentId) {
+  return `/docs/${patientId}/${documentId}`;
+}
+
 
 /**
  * Der Pfad für `GET /users` und `POST /users` — nur für `admin`.

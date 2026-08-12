@@ -84,7 +84,7 @@ const documentWithoutAttachment = {
  * Die Stammdaten und die Dokumente kommen aus zwei Endpunkten; ein Mock, der
  * auf beides dasselbe antwortet, würde jeden Verwechsler durchgehen lassen.
  */
-function mockApi({ patientResponse, documentsResponse, deleteResponse }) {
+function mockApi({ patientResponse, documentsResponse, deleteResponse, updateResponse }) {
   apiRequest.mockImplementation((path, options) => {
     if (options?.method === "DELETE" && path.startsWith("/patients/")) {
       return typeof deleteResponse === "function"
@@ -97,6 +97,11 @@ function mockApi({ patientResponse, documentsResponse, deleteResponse }) {
         : Promise.resolve(patientResponse);
     }
     if (path.startsWith("/docs/")) {
+      if (options?.method === "PATCH") {
+        return typeof updateResponse === "function"
+          ? updateResponse(path, options)
+          : Promise.resolve(updateResponse);
+      }
       return typeof documentsResponse === "function"
         ? documentsResponse(path)
         : Promise.resolve(documentsResponse);
@@ -327,6 +332,54 @@ describe("PatientDetailPage", () => {
 
     expect(screen.getByText("Großes Blutbild")).toBeInTheDocument();
     expect(screen.queryByText("MRT linkes Knie")).not.toBeInTheDocument();
+  });
+
+  it("speichert bearbeitete Dokumentangaben über PATCH und zeigt die API-Antwort", async () => {
+    const updatedDocument = {
+      ...documentWithAttachment,
+      title: "MRT linkes Knie – korrigiert",
+      description: "Neue Beschreibung",
+      tags: ["mrt", "knie"],
+      source: "Neue Radiologie",
+      updated_at: "2026-08-11T10:00:00Z",
+    };
+    mockApi({
+      patientResponse: patient,
+      documentsResponse: page([documentWithAttachment]),
+      updateResponse: updatedDocument,
+    });
+
+    renderDetailPage();
+    await screen.findByText("MRT linkes Knie");
+
+    fireEvent.click(screen.getByRole("button", { name: "Bearbeiten" }));
+    fireEvent.change(screen.getByDisplayValue("MRT linkes Knie"), {
+      target: { value: "MRT linkes Knie – korrigiert" },
+    });
+    fireEvent.change(screen.getByDisplayValue("Anhaltende Schmerzen nach Sturz beim Sport."), {
+      target: { value: "Neue Beschreibung" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(apiRequest).toHaveBeenCalledWith(
+        "/docs/7/5eed0000000000000000000000000001",
+        expect.objectContaining({
+          method: "PATCH",
+          token: "stored-token",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            document_type: "befund",
+            title: "MRT linkes Knie – korrigiert",
+            description: "Neue Beschreibung",
+            tags: "mrt, radiologie",
+            source: "Radiologie Mitte",
+          }),
+        }),
+      ),
+    );
+
+    expect(await screen.findByText("MRT linkes Knie – korrigiert")).toBeInTheDocument();
   });
 
   describe("Löschen", () => {
