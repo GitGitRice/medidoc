@@ -85,15 +85,18 @@ export function PatientDetailPage() {
     return () => controller.abort();
   }, [apiFetch, patientId]);
 
-  /**
-   * Entfernt ein Dokument aus der Liste.
-   *
-   * Noch **ohne** `DELETE /docs/{patient_id}/{document_id}` — das Löschen
-   * wirklich wirken zu lassen ist Issue #78. Bis dahin ist es nur die Anzeige,
-   * und ein Neuladen bringt das Dokument zurück.
-   */
-  function handleDeleteDocument(id) {
-    setDocuments((current) => current.filter((document) => document.id !== id));
+  /** Löscht ein Dokument dauerhaft über das Backend und danach aus der Liste. */
+  async function handleDeleteDocument(id) {
+    setActionError(null);
+
+    try {
+      await apiFetch(documentPath(patientId, id), { method: "DELETE" });
+      setDocuments((current) =>
+        current.filter((document) => document.id !== id),
+      );
+    } catch (deleteRequestError) {
+      setActionError(deleteRequestError);
+    }
   }
 
   async function handleCreateDocument(formData) {

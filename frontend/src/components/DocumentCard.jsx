@@ -51,10 +51,12 @@ function DocumentCard({ document, isEditing, onDelete, onStartEdit, onCancelEdit
     setDeleteDialogOpen(false);
   };
 
-  const handleConfirmDelete = () => {
-    onDelete(document.id);
-
-    setDeleteDialogOpen(false);
+  const handleConfirmDelete = async () => {
+    try {
+      await onDelete(document.id);
+    } finally {
+      setDeleteDialogOpen(false);
+    }
   };
 
 
