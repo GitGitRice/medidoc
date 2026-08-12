@@ -67,6 +67,65 @@ def parse_tags(raw: str | None) -> list[str]:
     return list(dict.fromkeys(cleaned))[:MAX_TAGS]
 
 
+def parse_fields(value: Any) -> dict[str, Any]:
+    """Nimmt die typabhängigen Angaben als JSON-Objekt entgegen.
+
+    Beim Anlegen reist `fields` als Text im Formular (`{"befund": "…"}`), weil
+    ein Multipart-Formular keine verschachtelten Werte kennt; beim Ändern kommt
+    es als echtes JSON-Objekt. Beide Wege landen hier, damit für dieselbe
+    Eingabe dieselbe Regel gilt.
+
+    Steht als Funktion neben den Models und nicht als Methode darin: Ein
+    Validator ist nach dem Dekorieren nicht mehr ohne Weiteres aufrufbar, und
+    zwei Models brauchen dieselbe Prüfung.
+    """
+    if value is None or value == "":
+        return {}
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            raise ValueError("muss ein JSON-Objekt sein") from None
+    if not isinstance(value, dict):
+        raise ValueError("muss ein JSON-Objekt sein")
+
+    if len(value) > MAX_FIELDS:
+        raise ValueError(f"höchstens {MAX_FIELDS} Angaben")
+
+    # Zu lang wird **abgelehnt**, nicht abgeschnitten. Ein stilles Kürzen
+    # gäbe ein `201` auf einen Laborwert zurück, in dem hinten etwas fehlt —
+    # und niemand sähe es, weil die Antwort den gekürzten Wert genauso
+    # ausliefert wie einen ganzen. In einer Akte ist ein abgeschnittener
+    # Wert schlimmer als ein abgelehnter. Die Doku sagt an dieser Stelle
+    # ohnehin `422` (docs/documents-api.md).
+    cleaned: dict[str, Any] = {}
+    for key, entry in value.items():
+        name = str(key).strip()
+        if not name:
+            raise ValueError("ein Schlüssel darf nicht leer sein")
+        if len(name) > MAX_FIELD_KEY_LENGTH:
+            raise ValueError(
+                f"„{name[:MAX_FIELD_KEY_LENGTH]}…“ ist länger als "
+                f"{MAX_FIELD_KEY_LENGTH} Zeichen"
+            )
+        if isinstance(entry, (bool, int, float)):
+            cleaned[name] = entry
+        elif isinstance(entry, str):
+            text = entry.strip()
+            if len(text) > MAX_FIELD_VALUE_LENGTH:
+                raise ValueError(
+                    f"der Wert von „{name}“ ist länger als "
+                    f"{MAX_FIELD_VALUE_LENGTH} Zeichen"
+                )
+            cleaned[name] = text
+        else:
+            raise ValueError(
+                f"„{name}“ muss ein einzelner Wert sein, keine Liste und kein Objekt"
+            )
+
+    return cleaned
+
+
 class Attachment(BaseModel):
     """Der Anhang eines Dokuments — die angehängte Datei.
 
@@ -103,6 +162,10 @@ class DocumentPublic(BaseModel):
     attachment: Attachment | None = None
 
     created_at: datetime
+    # `None`, solange das Dokument nie geändert wurde. Bewusst nicht mit
+    # `created_at` vorbelegt: „nie geändert" und „heute angelegt und geändert"
+    # sind zwei verschiedene Aussagen, und in einer Akte zählt der Unterschied.
+    updated_at: datetime | None = None
 
 
 class DocumentPage(BaseModel):
@@ -173,55 +236,83 @@ class DocumentMetadata(BaseModel):
     @field_validator("fields", mode="before")
     @classmethod
     def _parse_fields(cls, value: Any) -> dict[str, Any]:
-        """Nimmt die typabhängigen Angaben als JSON-Objekt entgegen.
+        return parse_fields(value)
 
-        Im Formular reist `fields` als Text (`{"befund": "unauffaellig"}`), weil
-        ein Multipart-Formular keine verschachtelten Werte kennt. `mode="before"`
-        heißt: Das Zerlegen passiert **innerhalb** der Prüfung, ein kaputtes JSON
-        wird damit zum gewohnten `422` mit Feldnamen und nicht zu einem `500`.
+
+class DocumentUpdate(BaseModel):
+    """Der Rumpf von `PATCH` — alles optional.
+
+    **JSON, nicht multipart.** Beim Anlegen reist ein Anhang mit, deshalb ist
+    das ein Formular; hier ändern sich nur die Angaben, und dafür ist JSON die
+    natürliche Form. Nebeneffekt: FastAPI prüft den Rumpf selbst, das `422`
+    entsteht ohne Zutun im gewohnten Format.
+
+    Weggelassene Felder bleiben unverändert. Das Formular im Frontend kann
+    einzelne Felder schicken, statt das ganze Dokument zurückzuspielen.
+
+    **Nicht änderbar sind `patient_id` und der Anhang.** Ein Dokument einem
+    anderen Patienten zuzuordnen ist keine Korrektur, sondern eine Verlagerung —
+    dafür gäbe es Löschen und neu Anlegen. Und ein Anhang reist nicht durch
+    JSON.
+    """
+
+    document_type: str | None = None
+    title: str | None = None
+    description: str | None = None
+    source: str | None = None
+
+    # Kommagetrennt wie beim Anlegen, damit dieselbe Eingabe denselben Weg
+    # nimmt. `""` leert die Schlagworte.
+    tags: str | None = None
+
+    # Ersetzt die typabhängigen Angaben **vollständig**, es wird nicht
+    # zusammengeführt. Sonst liesse sich ein einmal gesetzter Schlüssel nie
+    # wieder entfernen.
+    fields: dict[str, FieldValue] | None = None
+
+    @field_validator("document_type")
+    @classmethod
+    def _document_type_not_blank(cls, value: str | None) -> str:
+        """Wie beim Anlegen — und `null` ist hier kein gültiger Wert.
+
+        `document_type` und `title` sind Pflichtangaben des Dokuments. Sie
+        dürfen weggelassen, aber nicht geleert werden; sonst entstünde über
+        `PATCH` ein Dokument, das über `POST` nie hätte angelegt werden können.
         """
-        if value is None or value == "":
-            return {}
-        if isinstance(value, str):
-            try:
-                value = json.loads(value)
-            except ValueError:
-                raise ValueError("muss ein JSON-Objekt sein") from None
-        if not isinstance(value, dict):
-            raise ValueError("muss ein JSON-Objekt sein")
-
-        if len(value) > MAX_FIELDS:
-            raise ValueError(f"höchstens {MAX_FIELDS} Angaben")
-
-        # Zu lang wird **abgelehnt**, nicht abgeschnitten. Ein stilles Kürzen
-        # gäbe ein `201` auf einen Laborwert zurück, in dem hinten etwas fehlt —
-        # und niemand sähe es, weil die Antwort den gekürzten Wert genauso
-        # ausliefert wie einen ganzen. In einer Akte ist ein abgeschnittener
-        # Wert schlimmer als ein abgelehnter. Die Doku sagt an dieser Stelle
-        # ohnehin `422` (docs/documents-api.md).
-        cleaned: dict[str, Any] = {}
-        for key, entry in value.items():
-            name = str(key).strip()
-            if not name:
-                raise ValueError("ein Schlüssel darf nicht leer sein")
-            if len(name) > MAX_FIELD_KEY_LENGTH:
-                raise ValueError(
-                    f"„{name[:MAX_FIELD_KEY_LENGTH]}…“ ist länger als "
-                    f"{MAX_FIELD_KEY_LENGTH} Zeichen"
-                )
-            if isinstance(entry, (bool, int, float)):
-                cleaned[name] = entry
-            elif isinstance(entry, str):
-                text = entry.strip()
-                if len(text) > MAX_FIELD_VALUE_LENGTH:
-                    raise ValueError(
-                        f"der Wert von „{name}“ ist länger als "
-                        f"{MAX_FIELD_VALUE_LENGTH} Zeichen"
-                    )
-                cleaned[name] = text
-            else:
-                raise ValueError(
-                    f"„{name}“ muss ein einzelner Wert sein, keine Liste und kein Objekt"
-                )
-
+        if value is None:
+            raise ValueError("darf nicht auf null gesetzt werden")
+        cleaned = value.strip().lower()
+        if not cleaned:
+            raise ValueError("darf nicht leer sein")
         return cleaned
+
+    @field_validator("title")
+    @classmethod
+    def _title_not_blank(cls, value: str | None) -> str:
+        if value is None:
+            raise ValueError("darf nicht auf null gesetzt werden")
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("darf nicht leer sein")
+        return cleaned
+
+    @field_validator("description", "source")
+    @classmethod
+    def _blank_becomes_none(cls, value: str | None) -> str | None:
+        """`""` leert das Feld — hier ist das eine gültige Absicht."""
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+    @field_validator("fields", mode="before")
+    @classmethod
+    def _parse_fields(cls, value: Any) -> Any:
+        """Dieselbe Prüfung wie beim Anlegen.
+
+        `None` heißt hier „nicht mitgeschickt" und bleibt `None` — sonst würde
+        ein `PATCH` ohne `fields` die vorhandenen Angaben leeren.
+        """
+        if value is None:
+            return None
+        return parse_fields(value)

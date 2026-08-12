@@ -798,6 +798,349 @@ class TestSuchePredikat:
         assert not matches_term({}, "mrt")
 
 
+class TestAendern:
+    """PATCH /docs/{patient_id}/{document_id}
+
+    **JSON, nicht multipart** — anders als beim Anlegen reist hier kein Anhang
+    mit.
+    """
+
+    def _angelegt(self, client, headers, patient_id, **form):
+        return create(client, headers, patient_id, **form).json()
+
+    def test_aendert_nur_die_mitgeschickten_felder(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = self._angelegt(
+            client,
+            admin_headers,
+            patient.id,
+            title="Alter Titel",
+            description="Bleibt stehen",
+            tags="mrt, knie",
+        )
+
+        response = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"title": "Neuer Titel"},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["title"] == "Neuer Titel"
+        assert body["description"] == "Bleibt stehen"
+        assert body["tags"] == ["mrt", "knie"]
+        assert body["document_type"] == "befund"
+
+    def test_liefert_das_ganze_dokument_zurueck(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id)
+
+        body = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"title": "Neu"},
+            headers=admin_headers,
+        ).json()
+
+        assert body["id"] == document["id"]
+        assert body["patient_id"] == patient.id
+        assert body["created_at"] == document["created_at"]
+        assert body["attachment"] == document["attachment"]
+
+    def test_die_aenderung_ist_danach_wirklich_gespeichert(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """Beweist, dass geschrieben und nicht nur zurückgespiegelt wird."""
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id)
+
+        client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"title": "Wirklich neu"},
+            headers=admin_headers,
+        )
+
+        items = client.get(f"{BASE}/{patient.id}", headers=admin_headers).json()["items"]
+        assert items[0]["title"] == "Wirklich neu"
+
+    def test_updated_at_ist_vorher_leer_und_danach_gesetzt(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """„Nie geändert" und „heute geändert" sind zwei verschiedene Aussagen."""
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id)
+        assert document["updated_at"] is None
+
+        body = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"title": "Neu"},
+            headers=admin_headers,
+        ).json()
+
+        assert body["updated_at"] is not None
+
+    def test_dokumenttyp_wird_vereinheitlicht(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id)
+
+        body = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"document_type": "  ARZTBRIEF  "},
+            headers=admin_headers,
+        ).json()
+
+        assert body["document_type"] == "arztbrief"
+
+    def test_tags_kommen_kommagetrennt_herein_und_als_liste_hinaus(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id, tags="alt")
+
+        body = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"tags": "MRT, radiologie, mrt"},
+            headers=admin_headers,
+        ).json()
+
+        assert body["tags"] == ["mrt", "radiologie"]
+
+    def test_leere_tags_leeren_die_schlagworte(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id, tags="mrt")
+
+        body = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"tags": ""},
+            headers=admin_headers,
+        ).json()
+
+        assert body["tags"] == []
+
+    def test_optionale_felder_lassen_sich_leeren(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = self._angelegt(
+            client, admin_headers, patient.id, description="Weg damit", source="Labor"
+        )
+
+        body = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"description": None, "source": ""},
+            headers=admin_headers,
+        ).json()
+
+        assert body["description"] is None
+        assert body["source"] is None
+
+    def test_fields_werden_ersetzt_nicht_zusammengefuehrt(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """Sonst liesse sich ein einmal gesetzter Schlüssel nie wieder entfernen."""
+        patient = make_patient()
+        document = self._angelegt(
+            client, admin_headers, patient.id, fields='{"hb": 13.4, "einheit": "g/dl"}'
+        )
+
+        body = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"fields": {"hb": 12.1}},
+            headers=admin_headers,
+        ).json()
+
+        assert body["fields"] == {"hb": 12.1}
+
+    def test_ohne_fields_bleiben_die_angaben_stehen(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """`fields` weglassen heißt „nicht anfassen", nicht „leeren"."""
+        patient = make_patient()
+        document = self._angelegt(
+            client, admin_headers, patient.id, fields='{"hb": 13.4}'
+        )
+
+        body = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"title": "Neu"},
+            headers=admin_headers,
+        ).json()
+
+        assert body["fields"] == {"hb": 13.4}
+
+    def test_leerer_rumpf_ist_erlaubt(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id)
+
+        response = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}", json={}, headers=admin_headers
+        )
+
+        assert response.status_code == 200
+        assert response.json()["title"] == document["title"]
+
+    @pytest.mark.parametrize("feld", ["document_type", "title"])
+    def test_pflichtfeld_auf_null_liefert_422(
+        self, client: TestClient, admin_headers, make_patient, feld
+    ):
+        """Sonst entstünde über PATCH ein Dokument, das POST nie erlaubt hätte."""
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id)
+
+        response = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={feld: None},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 422
+        assert response.json()["errors"][0]["field"] == feld
+
+    @pytest.mark.parametrize("feld", ["document_type", "title"])
+    def test_leeres_pflichtfeld_liefert_422(
+        self, client: TestClient, admin_headers, make_patient, feld
+    ):
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id)
+
+        response = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={feld: "   "},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 422
+
+    def test_verschachtelte_fields_werden_abgewiesen(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """Dieselbe Prüfung wie beim Anlegen."""
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id)
+
+        response = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"fields": {"a": {"b": "c"}}},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 422
+
+    def test_der_patient_laesst_sich_nicht_umhaengen(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """`patient_id` steht nicht im Rumpf — was nicht im Model steht, wirkt nicht."""
+        patient = make_patient(first_name="Max")
+        other = make_patient(first_name="Erika")
+        document = self._angelegt(client, admin_headers, patient.id)
+
+        body = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"patient_id": other.id, "title": "Neu"},
+            headers=admin_headers,
+        ).json()
+
+        assert body["patient_id"] == patient.id
+        assert client.get(f"{BASE}/{other.id}", headers=admin_headers).json()["total"] == 0
+
+    def test_unbekanntes_dokument_liefert_404(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+
+        response = client.patch(
+            f"{BASE}/{patient.id}/gibtesnicht",
+            json={"title": "Neu"},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 404
+        assert "gibtesnicht" in response.json()["message"]
+
+    def test_unbekannter_patient_liefert_404(self, client: TestClient, admin_headers):
+        response = client.patch(
+            f"{BASE}/999999/egal", json={"title": "Neu"}, headers=admin_headers
+        )
+
+        assert response.status_code == 404
+
+    def test_fremdes_dokument_laesst_sich_nicht_ueber_einen_anderen_patienten_aendern(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        """Die Patienten-ID im Pfad ist nicht nur Zierde."""
+        one = make_patient(first_name="Max")
+        other = make_patient(first_name="Erika")
+        document = self._angelegt(client, admin_headers, one.id, title="Unberuehrt")
+
+        response = client.patch(
+            f"{BASE}/{other.id}/{document['id']}",
+            json={"title": "Gekapert"},
+            headers=admin_headers,
+        )
+
+        assert response.status_code == 404
+        items = client.get(f"{BASE}/{one.id}", headers=admin_headers).json()["items"]
+        assert items[0]["title"] == "Unberuehrt"
+
+    def test_staff_darf_aendern(
+        self, client: TestClient, staff_headers, make_patient
+    ):
+        """Dieselbe Linie wie beim Bearbeiten eines Patienten — nur Löschen ist admin."""
+        patient = make_patient()
+        document = self._angelegt(client, staff_headers, patient.id)
+
+        response = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"title": "Von staff geaendert"},
+            headers=staff_headers,
+        )
+
+        assert response.status_code == 200
+
+    def test_ohne_token_wird_nichts_geaendert(
+        self, client: TestClient, admin_headers, make_patient
+    ):
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id)
+
+        response = client.patch(
+            f"{BASE}/{patient.id}/{document['id']}", json={"title": "Neu"}
+        )
+
+        assert response.status_code == 401
+
+    def test_die_aenderung_steht_im_audit_trail(
+        self, client: TestClient, admin_headers, make_patient, audit_store
+    ):
+        patient = make_patient()
+        document = self._angelegt(client, admin_headers, patient.id)
+
+        client.patch(
+            f"{BASE}/{patient.id}/{document['id']}",
+            json={"title": "Geheimer Patientenname", "tags": "mrt"},
+            headers=admin_headers,
+        )
+
+        treffer = [
+            e for e in audit_store.recent(500) if e["event"] == EventType.DOCUMENT_UPDATED
+        ]
+        assert len(treffer) == 1
+        assert treffer[0]["target"] == f"document:{document['id']}"
+        # Welche Felder, nicht womit sie gefüllt wurden.
+        assert treffer[0]["detail"]["fields"] == ["tags", "title"]
+        assert "Geheimer" not in str(treffer)
+
+
 class TestLoeschen:
     """DELETE /docs/{patient_id}/{document_id}"""
 

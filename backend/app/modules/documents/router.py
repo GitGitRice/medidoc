@@ -4,6 +4,7 @@
 | ------- | ---- | - |
 | `POST` | `/docs/{patient_id}` | Dokument anlegen, multipart |
 | `GET` | `/docs/{patient_id}?q=&limit=&offset=` | Dokumente auflisten |
+| `PATCH` | `/docs/{patient_id}/{document_id}` | Angaben ändern, JSON |
 | `DELETE` | `/docs/{patient_id}/{document_id}` | Dokument löschen, nur `admin` |
 
 Ein Dokument besteht aus Angaben und **optional** einem Anhang (CONTEXT.md).
@@ -53,6 +54,7 @@ from app.modules.documents.schemas import (
     DocumentMetadata,
     DocumentPage,
     DocumentPublic,
+    DocumentUpdate,
     parse_tags,
 )
 from app.modules.documents.storage import EmptyFile, FileTooLarge
@@ -208,6 +210,62 @@ def list_documents(
 
     items, total = service.search(patient_id, q=q, limit=limit, offset=offset)
     return DocumentPage(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.patch(
+    "/{patient_id}/{document_id}",
+    response_model=DocumentPublic,
+    summary="Angaben eines Dokuments ändern",
+    responses={401: UNAUTHORIZED, 404: NOT_FOUND, 422: UNPROCESSABLE},
+)
+def update_document(
+    request: Request,
+    session: SessionDep,
+    patient_id: int,
+    document_id: str,
+    data: DocumentUpdate,
+) -> DocumentPublic:
+    """Ändert nur die mitgeschickten Angaben und gibt das ganze Dokument zurück.
+
+    **JSON, nicht multipart** — anders als beim Anlegen reist hier kein Anhang
+    mit, und für reine Angaben ist JSON die natürliche Form.
+
+    Weggelassene Felder bleiben unverändert. `document_type` und `title` dürfen
+    weggelassen, aber nicht geleert werden; `description` und `source` lassen
+    sich mit `null` oder `""` leeren. `fields` **ersetzt** die typabhängigen
+    Angaben vollständig — sonst liesse sich ein Schlüssel nie wieder entfernen.
+
+    Nicht änderbar sind der Patient und der Anhang: Ein Dokument einem anderen
+    Patienten zuzuordnen ist keine Korrektur, und ein Anhang reist nicht durch
+    JSON.
+
+    `staff` darf ändern — dieselbe Linie wie beim Bearbeiten eines Patienten
+    (ADR-0005). Nur das Löschen bleibt `admin` vorbehalten.
+    """
+    _patient_or_404(session, patient_id)
+
+    document = service.update(patient_id, document_id, data)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Dokument {document_id} wurde für diesen Patienten nicht gefunden",
+        )
+
+    audit.record(
+        EventType.DOCUMENT_UPDATED,
+        request=request,
+        status=status.HTTP_200_OK,
+        user_id=request.state.user_id,
+        target=f"document:{document_id}",
+        # Welche Felder angefasst wurden, nicht womit sie gefüllt wurden — im
+        # Titel und in `fields` stehen in der Praxis Patientenangaben.
+        detail={
+            "patient": f"patient:{patient_id}",
+            "fields": sorted(data.model_dump(exclude_unset=True)),
+        },
+    )
+
+    return document
 
 
 @router.delete(

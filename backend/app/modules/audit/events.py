@@ -45,6 +45,7 @@ class EventType(StrEnum):
     # Praxis gern "Mueller_Befund.pdf" und wäre damit genau die Patientenangabe,
     # die hier nicht hingehört.
     DOCUMENT_CREATED = "document_created"
+    DOCUMENT_UPDATED = "document_updated"
     DOCUMENT_DELETED = "document_deleted"
 
     # Zugriff auf eine ID, die es nicht gibt. Einzeln harmlos, gehäuft der
@@ -69,6 +70,7 @@ _INFO_EVENTS = frozenset(
         EventType.PATIENT_UPDATED,
         EventType.PATIENT_DELETED,
         EventType.DOCUMENT_CREATED,
+        EventType.DOCUMENT_UPDATED,
         EventType.DOCUMENT_DELETED,
     }
 )
