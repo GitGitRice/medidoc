@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function PatientDetail( { patient } ) {
+export default function PatientDetail({ patient, canDelete = false, onDeleteClick }) {
   const formatDate = (date) => {
     if (!date) return "—";
 
@@ -64,8 +64,21 @@ export default function PatientDetail( { patient } ) {
             </p>
           </div>
 
-          {insuranceLabel && (
-            <span style={styles.patient_badge}>{insuranceLabel}</span>
+          {(insuranceLabel || canDelete) && (
+            <div style={styles.patient_headerActions}>
+              {insuranceLabel && (
+                <span style={styles.patient_badge}>{insuranceLabel}</span>
+              )}
+              {canDelete && (
+                <button
+                  type="button"
+                  style={styles.patient_deleteButton}
+                  onClick={onDeleteClick}
+                >
+                  Patient löschen
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -202,6 +215,13 @@ const styles = {
     fontSize: "14px",
   },
 
+  patient_headerActions: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: "10px",
+  },
+
   patient_badge: {
     background: "#ecfdf5",
     color: "#047857",
@@ -211,6 +231,18 @@ const styles = {
     fontSize: "12px",
     fontWeight: 700,
     whiteSpace: "nowrap",
+  },
+
+  patient_deleteButton: {
+    padding: "7px 14px",
+    borderRadius: "8px",
+    border: "1px solid #fecaca",
+    background: "#fef2f2",
+    color: "#dc2626",
+    fontSize: "13px",
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    cursor: "pointer",
   },
 
   patient_divider: {

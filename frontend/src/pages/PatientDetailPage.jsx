@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -10,6 +10,7 @@ import Typography from "@mui/material/Typography";
 import { documentsPath, patientPath } from "../api.js";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { CreateDocumentCard } from "../components/CreateDocumentCard.jsx";
+import DeleteConfirmDialog from "../components/dialogs/DeleteConfirmDialog";
 import DocumentList from "../components/DocumentList";
 import PatientDetail from "../components/PatientDetail";
 
@@ -32,7 +33,8 @@ import "../css/PatientDetailPage.css";
  */
 export function PatientDetailPage() {
   const { patientId } = useParams();
-  const { apiFetch } = useAuth();
+  const { apiFetch, hasRole } = useAuth();
+  const navigate = useNavigate();
 
   // `null` heißt "noch nicht geladen" und ist damit etwas anderes als die
   // leere Liste: Ein Patient ohne Dokumente ist ein gültiger Zustand, kein
@@ -43,6 +45,14 @@ export function PatientDetailPage() {
 
   const [searchTextDocuments, setSearchTextDocuments] = useState("");
   const [editingId, setEditingId] = useState(null);
+
+  // Eigener Zustand fuer das Loeschen (Issue #22) — getrennt vom Lade-Fehler
+  // oben: Ein gescheitertes Loeschen soll die geladene Akte nicht durch eine
+  // "Patient nicht gefunden"-Seite ersetzen, sondern als Meldung auf der
+  // weiterhin sichtbaren Seite stehen.
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -112,6 +122,47 @@ export function PatientDetailPage() {
     setEditingId(null);
   }
 
+  function openDeleteDialog() {
+    setDeleteError(null);
+    setIsDeleteDialogOpen(true);
+  }
+
+  function closeDeleteDialog() {
+    if (isDeleting) {
+      return;
+    }
+    setIsDeleteDialogOpen(false);
+  }
+
+  /**
+   * Loescht den Patienten endgueltig (`DELETE /patients/{id}`, admin-only,
+   * docs/patients-api.md).
+   *
+   * Ein `500` hier bedeutet nicht "nichts passiert" — Postgres hat den
+   * Patienten zu dem Zeitpunkt bereits entfernt, nur das Aufraeumen der Akte
+   * ist gescheitert. Ein erneuter Versuch faende ihn also nicht mehr und
+   * antwortete mit `404`. Deshalb kein automatischer Retry und keine
+   * Navigation bei einem Fehler — nur die Meldung, und die Seite bleibt
+   * stehen, damit niemand blind ein zweites Mal klickt.
+   */
+  async function confirmDelete() {
+    if (isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await apiFetch(patientPath(patientId), { method: "DELETE" });
+      setIsDeleteDialogOpen(false);
+      navigate("/");
+    } catch (deleteRequestError) {
+      setIsDeleteDialogOpen(false);
+      setDeleteError(deleteRequestError);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   if (error) {
     return (
       <Box>
@@ -150,7 +201,21 @@ export function PatientDetailPage() {
   return (
     <div className="app-main">
       <aside className="app-sidebar">
-        <PatientDetail patient={patient} />
+        {deleteError && (
+          <Alert
+            severity="error"
+            sx={{ marginBlockEnd: 2 }}
+            onClose={() => setDeleteError(null)}
+          >
+            {deleteError.message}
+          </Alert>
+        )}
+
+        <PatientDetail
+          patient={patient}
+          canDelete={hasRole("admin")}
+          onDeleteClick={openDeleteDialog}
+        />
       </aside>
 
       <section className="app-content">
@@ -179,6 +244,14 @@ export function PatientDetailPage() {
           onUpdateDocument={handleUpdateDocument}
         />
       </section>
+
+      <DeleteConfirmDialog
+        open={isDeleteDialogOpen}
+        title="Patient löschen?"
+        message={`Möchtest du ${patient.first_name} ${patient.last_name} wirklich löschen?`}
+        onConfirm={confirmDelete}
+        onCancel={closeDeleteDialog}
+      />
     </div>
   );
 }

@@ -23,6 +23,13 @@ const adminUser = {
   role: "admin",
 };
 
+const staffUser = {
+  id: 2,
+  email: "tom.staff@medidoc.test",
+  name: "Tom Staff",
+  role: "staff",
+};
+
 const patient = {
   id: 7,
   first_name: "Max",
@@ -77,8 +84,13 @@ const documentWithoutAttachment = {
  * Die Stammdaten und die Dokumente kommen aus zwei Endpunkten; ein Mock, der
  * auf beides dasselbe antwortet, würde jeden Verwechsler durchgehen lassen.
  */
-function mockApi({ patientResponse, documentsResponse }) {
-  apiRequest.mockImplementation((path) => {
+function mockApi({ patientResponse, documentsResponse, deleteResponse }) {
+  apiRequest.mockImplementation((path, options) => {
+    if (options?.method === "DELETE" && path.startsWith("/patients/")) {
+      return typeof deleteResponse === "function"
+        ? deleteResponse(path)
+        : Promise.resolve(deleteResponse);
+    }
     if (path.startsWith("/patients/")) {
       return typeof patientResponse === "function"
         ? patientResponse(path)
@@ -104,15 +116,16 @@ function NextPatientButton() {
   );
 }
 
-function renderDetailPage(patientId = 7) {
+function renderDetailPage(patientId = 7, currentUser = adminUser) {
   window.localStorage.setItem("medidoc.accessToken", "stored-token");
-  getCurrentUser.mockResolvedValue(adminUser);
+  getCurrentUser.mockResolvedValue(currentUser);
 
   return render(
     <MemoryRouter initialEntries={[`/patients/${patientId}`]}>
       <AuthProvider>
         <NextPatientButton />
         <Routes>
+          <Route index element={<p>Übersicht-Platzhalter</p>} />
           <Route path="/patients/:patientId" element={<PatientDetailPage />} />
         </Routes>
       </AuthProvider>
@@ -314,5 +327,110 @@ describe("PatientDetailPage", () => {
 
     expect(screen.getByText("Großes Blutbild")).toBeInTheDocument();
     expect(screen.queryByText("MRT linkes Knie")).not.toBeInTheDocument();
+  });
+
+  describe("Löschen", () => {
+    it("zeigt die Löschen-Aktion für admin", async () => {
+      mockApi({ patientResponse: patient, documentsResponse: page() });
+
+      renderDetailPage();
+
+      expect(
+        await screen.findByRole("button", { name: "Patient löschen" }),
+      ).toBeInTheDocument();
+    });
+
+    it("zeigt die Löschen-Aktion nicht für staff", async () => {
+      mockApi({ patientResponse: patient, documentsResponse: page() });
+
+      renderDetailPage(7, staffUser);
+      await screen.findByText("Max Mustermann");
+
+      expect(
+        screen.queryByRole("button", { name: "Patient löschen" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("öffnet beim Klick die Bestätigung mit dem vollen Namen", async () => {
+      mockApi({ patientResponse: patient, documentsResponse: page() });
+
+      renderDetailPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Patient löschen" }));
+
+      expect(await screen.findByText("Patient löschen?")).toBeInTheDocument();
+      expect(
+        screen.getByText("Möchtest du Max Mustermann wirklich löschen?"),
+      ).toBeInTheDocument();
+    });
+
+    it("sendet beim Abbrechen kein DELETE und schließt den Dialog", async () => {
+      mockApi({ patientResponse: patient, documentsResponse: page() });
+
+      renderDetailPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Patient löschen" }));
+      await screen.findByText("Patient löschen?");
+
+      fireEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+
+      await waitFor(() =>
+        expect(screen.queryByText("Patient löschen?")).not.toBeInTheDocument(),
+      );
+      // Nur die beiden Requests beim Laden — kein DELETE.
+      expect(apiRequest).toHaveBeenCalledTimes(2);
+    });
+
+    it("sendet beim Bestätigen DELETE /patients/{id}", async () => {
+      mockApi({ patientResponse: patient, documentsResponse: page(), deleteResponse: null });
+
+      renderDetailPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Patient löschen" }));
+      await screen.findByText("Patient löschen?");
+
+      fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+
+      await waitFor(() => {
+        expect(apiRequest).toHaveBeenCalledWith(
+          "/patients/7",
+          expect.objectContaining({ method: "DELETE", token: "stored-token" }),
+        );
+      });
+    });
+
+    it("navigiert nach erfolgreichem Löschen zur Übersicht", async () => {
+      mockApi({ patientResponse: patient, documentsResponse: page(), deleteResponse: null });
+
+      renderDetailPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Patient löschen" }));
+      await screen.findByText("Patient löschen?");
+
+      fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+
+      expect(await screen.findByText("Übersicht-Platzhalter")).toBeInTheDocument();
+    });
+
+    it("zeigt bei einem gescheiterten Löschen die Fehlermeldung und bleibt auf der Seite", async () => {
+      const forbidden = new ApiError("Dazu fehlt dir die Berechtigung", 403);
+      mockApi({
+        patientResponse: patient,
+        documentsResponse: page(),
+        deleteResponse: () => Promise.reject(forbidden),
+      });
+
+      renderDetailPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Patient löschen" }));
+      await screen.findByText("Patient löschen?");
+
+      fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+
+      expect(
+        await screen.findByText("Dazu fehlt dir die Berechtigung"),
+      ).toBeInTheDocument();
+      // Dialog schließt, aber die Seite bleibt stehen — kein Redirect.
+      await waitFor(() =>
+        expect(screen.queryByText("Patient löschen?")).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Übersicht-Platzhalter")).not.toBeInTheDocument();
+      expect(screen.getByText("Max Mustermann")).toBeInTheDocument();
+    });
   });
 });
