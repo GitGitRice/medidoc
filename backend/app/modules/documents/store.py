@@ -71,6 +71,11 @@ class DocumentStore(Protocol):
         self, patient_id: int, q: str | None, limit: int, offset: int
     ) -> tuple[list[dict[str, Any]], int]: ...
 
+    def update(
+        self, patient_id: int, document_id: str, changes: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Ändert die übergebenen Felder. `None`, wenn es das Dokument nicht gibt."""
+
     def delete(self, patient_id: int, document_id: str) -> bool:
         """`True`, wenn wirklich etwas gelöscht wurde."""
 
@@ -114,6 +119,15 @@ class MemoryDocumentStore:
         found.sort(key=lambda d: (d["created_at"], d["_id"]), reverse=True)
 
         return [dict(d) for d in found[offset : offset + limit]], len(found)
+
+    def update(
+        self, patient_id: int, document_id: str, changes: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        for document in self._documents:
+            if document["_id"] == document_id and document["patient_id"] == patient_id:
+                document.update(changes)
+                return dict(document)
+        return None
 
     def delete(self, patient_id: int, document_id: str) -> bool:
         before = len(self._documents)
@@ -187,6 +201,21 @@ class MongoDocumentStore:
         )
 
         return list(found), self._collection.count_documents(query)
+
+    def update(
+        self, patient_id: int, document_id: str, changes: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        # `find_one_and_update` statt Lesen-Ändern-Schreiben: ein Zugriff, und
+        # zwei gleichzeitige Änderungen können sich nicht gegenseitig
+        # überschreiben. `AFTER` liefert den Stand *nach* der Änderung — sonst
+        # gäbe die Antwort den alten Titel zurück.
+        from pymongo import ReturnDocument
+
+        return self._collection.find_one_and_update(
+            {"_id": document_id, "patient_id": patient_id},
+            {"$set": changes},
+            return_document=ReturnDocument.AFTER,
+        )
 
     def delete(self, patient_id: int, document_id: str) -> bool:
         result = self._collection.delete_one(

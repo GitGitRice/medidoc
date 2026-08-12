@@ -1,6 +1,6 @@
 # Dokumente — API-Vertrag
 
-> **Zweck:** Dokumente in der Akte eines Patienten anlegen, auflisten und löschen. Diese
+> **Zweck:** Dokumente in der Akte eines Patienten anlegen, auflisten, ändern und löschen. Diese
 > Datei ist die verbindliche Form. Ändert sich hier etwas, wird es hier geändert und im
 > Daily gesagt.
 >
@@ -12,7 +12,8 @@ Basis-URL lokal: `http://localhost:8000`
 
 ## Kurzfassung
 
-- **Jeder Endpunkt verlangt einen gültigen Token.** `DELETE` verlangt zusätzlich `admin`.
+- **Jeder Endpunkt verlangt einen gültigen Token.** Nur `DELETE` verlangt zusätzlich `admin` —
+  Anlegen und Ändern darf auch `staff`.
 - Angelegt wird **multipart**, nicht JSON — anders reist ein Anhang nicht.
 - **Der Anhang ist optional.** Ein Dokument ohne Anhang ist gültig.
 - **Höchstens 20 MB** je Anhang. Darüber `413`, geprüft beim Schreiben.
@@ -22,6 +23,7 @@ Basis-URL lokal: `http://localhost:8000`
 | ------- | ---- | ----- | ------ | -------- |
 | `POST` | `/docs/{patient_id}` | Dokument anlegen | `201` | Token |
 | `GET` | `/docs/{patient_id}?q=&limit=&offset=` | Dokumente auflisten | `200` | Token |
+| `PATCH` | `/docs/{patient_id}/{document_id}` | Angaben ändern | `200` | Token |
 | `DELETE` | `/docs/{patient_id}/{document_id}` | Dokument löschen | `204` | Token + `admin` |
 
 ## Namensgebung
@@ -100,6 +102,7 @@ wer das Backend ohne Compose startet, setzt sie in der `.env`.
 | `fields` | object | die typabhängigen Angaben, siehe unten. `{}`, wenn keine |
 | `attachment` | object \| null | der Anhang, oder `null` |
 | `created_at` | datetime | vom Server, UTC |
+| `updated_at` | datetime \| null | `null`, solange nie geändert |
 
 Der **Anhang**, wenn es einen gibt:
 
@@ -288,6 +291,70 @@ nicht alles, und eine Klammer bricht die Suche nicht ab.
 > `q` durchsucht **Titel und Beschreibung**, nicht `fields`. Die typabhängigen Angaben
 > stehen unter frei gewählten Schlüsseln; eine Suche darüber bräuchte erst eine Verabredung,
 > welche Schlüssel es gibt. Siehe [Offene Punkte](#offene-punkte).
+
+## PATCH /docs/{patient_id}/{document_id}
+
+Ändert die Angaben eines Dokuments. **JSON, nicht multipart** — anders als beim Anlegen
+reist hier kein Anhang mit, und für reine Angaben ist JSON die natürliche Form. Nebeneffekt:
+FastAPI prüft den Rumpf selbst, das `422` entsteht ohne Zutun im gewohnten Format.
+
+```json
+PATCH /docs/42/9f2c1ab34d5e4f7a8b0c1d2e3f4a5b6c
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "title": "Befund MRT — korrigiert", "tags": "mrt, radiologie, knie" }
+```
+
+Antwort ist das **vollständige** Dokument mit gesetztem `updated_at`, nicht nur das
+geänderte Feld.
+
+**Weggelassene Felder bleiben unverändert.** Das Formular kann ein einzelnes Feld schicken
+und muss das Dokument nicht zurückspielen.
+
+| Feld | Weglassen | `null` | `""` |
+| ---- | --------- | ------ | ---- |
+| `document_type` | bleibt | **`422`** | **`422`** |
+| `title` | bleibt | **`422`** | **`422`** |
+| `description`, `source` | bleibt | leert | leert |
+| `tags` | bleibt | leert | leert |
+| `fields` | bleibt | leert | — |
+
+`document_type` und `title` sind Pflichtangaben des Dokuments. Sie dürfen weggelassen, aber
+nicht geleert werden — sonst entstünde über `PATCH` ein Dokument, das über `POST` nie
+hätte angelegt werden können.
+
+**`fields` ersetzt vollständig, es wird nicht zusammengeführt.** Wer `{"hb": 12.1}` schickt,
+hat danach genau diesen einen Schlüssel. Beim Zusammenführen liesse sich ein einmal
+gesetzter Schlüssel nie wieder entfernen.
+
+### Was `PATCH` nicht kann
+
+- **Den Patienten wechseln.** `patient_id` steht nicht im Rumpf-Model; wird es trotzdem
+  mitgeschickt, wirkt es nicht. Ein Dokument einem anderen Patienten zuzuordnen ist keine
+  Korrektur, sondern eine Verlagerung — dafür gäbe es Löschen und neu Anlegen.
+- **Den Anhang austauschen.** Er reist nicht durch JSON. Ein neuer Anhang wäre ein neues
+  Dokument oder ein eigener Endpunkt.
+
+### Rollen
+
+**`staff` darf ändern.** Dieselbe Linie wie beim Bearbeiten eines Patienten; wer ein
+Dokument anlegen darf, darf einen Tippfehler darin auch korrigieren. Nur das **Löschen**
+bleibt `admin` vorbehalten — das ist die Aktion, die Daten unwiederbringlich entfernt.
+
+> [ADR-0005](./adr/0005-rollen-admin-und-staff.md) nennt für `staff` ausdrücklich nur
+> „Dokumente lesen und anlegen"; das Ändern steht dort nicht, weil der ADR vor den
+> Dokument-Endpunkten geschrieben wurde. **Gehört einmal ins Daily bestätigt.**
+
+### Zeitstempel
+
+`updated_at` ist `null`, solange ein Dokument nie geändert wurde — bewusst nicht mit
+`created_at` vorbelegt: „nie geändert" und „heute angelegt und geändert" sind zwei
+verschiedene Aussagen, und in einer Akte zählt der Unterschied.
+
+Beide Zeitstempel werden auf **Millisekunden** gekürzt. MongoDB speichert nicht genauer;
+ohne das Kürzen gäbe das Anlegen einen `created_at` mit Mikrosekunden zurück, den kein
+späterer Aufruf je wieder liefert.
 
 ## DELETE /docs/{patient_id}/{document_id}
 
