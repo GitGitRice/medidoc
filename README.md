@@ -116,9 +116,59 @@ von den Entwicklungsservern automatisch übernommen.
 
 PostgreSQL speichert die Patientenstammdaten im Volume `postgres_data`. MongoDB legt
 Dokument-Metadaten im Volume `mongo_data` ab; die eigentlichen Anhänge liegen getrennt
-im Volume `document_attachments`. `docker compose down` behält diese Daten, während
+im Volume `uploads_data`. `docker compose down` behält diese Daten, während
 `docker compose down -v` alle drei Volumes und deren Inhalte löscht.
 
+### Testdaten anlegen
+
+Frisch hochgefahren ist die Datenbank leer — es gibt noch keinen Benutzer, mit dem man
+sich anmelden könnte. Ein Aufruf legt alles auf einmal an: die beiden Startbenutzer,
+200 Testpatienten und 17 Dokumente in den Akten der ersten sechs.
+
+```bash
+docker compose exec fastapi python -m app.seed
+```
+
+Der Seed ist mehrfach ausführbar — Vorhandenes wird übersprungen, nicht überschrieben.
+
+**Benutzer.** Es gibt keine Selbstregistrierung; Benutzer entstehen in Sprint 1 nur über
+den Seed. Zugangsdaten und Rollen stehen in der `.env` (`SEED_ADMIN_*`, `SEED_STAFF_*`),
+die Voreinstellung aus `.env.example`:
+
+| E-Mail | Passwort | Rolle |
+| ------ | -------- | ----- |
+| `anna.admin@medidoc.test` | `geheim123` | `admin` |
+| `tom.staff@medidoc.test` | `geheim123` | `staff` |
+
+Wer andere Zugangsdaten will, ändert sie in der `.env` **vor** dem ersten Seed — ein
+zweiter Lauf erkennt den bestehenden Benutzer an seiner E-Mail und ändert kein Passwort.
+Details in [docs/auth-api.md](./docs/auth-api.md#seed-benutzer).
+
+**Patienten und Dokumente.** Beide kommen aus `backend/testdata/` und laufen dabei durch
+dieselbe Prüfung wie ein echter `POST`. Für schnelleres Ausprobieren reicht ein Teil:
+
+```bash
+docker compose exec fastapi python -m app.seed --patients 50   # nur die ersten 50
+docker compose exec fastapi python -m app.seed --no-documents  # ohne MongoDB
+```
+
+Die Dokumente brauchen MongoDB (ADR-0002); fehlt `MONGO_URL`, werden sie übersprungen und
+der Rest läuft trotzdem durch. Ihre Anhänge sind Platzhalter: Name, Typ und Größe stimmen,
+die Bytes sind ein kurzer Text — ausgeliefert werden sie ohnehin nicht, einen
+Download-Endpunkt gibt es noch nicht.
+
+Bei Modelländerungen zieht `create_all` geänderte Spalten **nicht** nach. Dann hilft nur
+wegwerfen und neu seeden:
+
+```bash
+docker compose down -v && docker compose up -d && docker compose exec fastapi python -m app.seed
+```
+
+## AWS-Demo
+
+Zusätzlich zum lokalen Compose-Stack läuft MediDoc für die Projektvorführung auf AWS
+EC2. Architektur, Einrichtung und Betrieb stehen in der
+[AWS-Deployment-Dokumentation](./docs/aws-deployment.md).
 ### Testdaten anlegen
 
 Frisch hochgefahren ist die Datenbank leer — es gibt noch keinen Benutzer, mit dem man
@@ -171,6 +221,7 @@ backend/            FastAPI-API, nach Features geschnitten — siehe backend/REA
 backend/tests/      pytest gegen SQLite im Speicher, braucht kein Docker
 backend/testdata/   erfundene Testdaten als JSON: 200 Patienten, 17 Dokumente
 frontend/           React (Vite)
+deploy/             Bootstrap- und Betriebsskripte für AWS
 docs/               ADRs, Sprint-Plan, API-Verträge
 ```
 

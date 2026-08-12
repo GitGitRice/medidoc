@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER muss in .env gesetzt sein}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss in .env gesetzt sein}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${DB_BIND_IP:-0.0.0.0}:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -15,6 +15,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    restart: unless-stopped
   mongo:
     image: mongo:7
     environment:
@@ -22,13 +23,14 @@ services:
     volumes:
       - mongo_data:/data/db
     ports:
-      - "${MONGO_DB_PORT:-27017}:27017"
+      - "${DB_BIND_IP:-0.0.0.0}:${MONGO_DB_PORT:-27017}:27017"
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
+    restart: unless-stopped
 
   fastapi:
     build:
@@ -72,6 +74,9 @@ services:
     environment:
       # Die URL wird im Browser aufgerufen; dort ist der Compose-Servicename unbekannt.
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      # Vite blockiert unbekannte Host-Header. Lokal bleibt localhost erlaubt; auf AWS
+      # wird hier der oeffentliche EC2-DNS-Name explizit gesetzt.
+      VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-localhost}
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
