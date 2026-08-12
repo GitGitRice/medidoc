@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   apiRequest,
+  documentPath,
   documentsPath,
   FORBIDDEN_ERROR,
   getCurrentUser,
@@ -107,6 +108,12 @@ describe("documentsPath", () => {
 
   it("lässt q bei leerer Suche weg", () => {
     expect(documentsPath(42, { q: "", limit: 100 })).toBe("/docs/42?limit=100");
+  });
+});
+
+describe("documentPath", () => {
+  it("zeigt auf ein einzelnes Dokument eines Patienten", () => {
+    expect(documentPath(42, "abc123")).toBe("/docs/42/abc123");
   });
 });
 
