@@ -137,14 +137,19 @@ VITE_API_URL=http://NEUER_EC2_DNS_NAME:8000
 VITE_ALLOWED_HOSTS=NEUER_EC2_DNS_NAME
 ```
 
-Datei über Session Manager bearbeiten und nur API und Frontend neu erstellen:
+Datei über Session Manager bearbeiten und API und Frontend neu bauen:
 
 ```bash
 sudo nano /opt/medidoc/.env
 cd /opt/medidoc
 sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  up -d --no-deps --force-recreate fastapi frontend
+  up -d --no-deps --build --force-recreate fastapi frontend
 ```
+
+Beim Frontend reicht `--force-recreate` allein nicht: `VITE_API_URL` wird von Vite zur
+Build-Zeit ins JS-Bundle eingebacken, nicht zur Laufzeit gelesen. Ohne `--build` würde
+der Container neu gestartet, aber weiterhin den alten, mit dem urspruenglichen
+EC2-Hostnamen gebauten Bundle ausliefern.
 
 Die Elastic IP bleibt bei einem Stoppen und Starten erhalten. Sie wird jedoch
 berechnet, solange sie im AWS-Konto reserviert ist – auch bei gestoppter Instanz.
