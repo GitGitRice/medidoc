@@ -182,52 +182,36 @@ docker compose down -v && docker compose up -d && docker compose exec fastapi py
 ## AWS-Demo
 
 Zusätzlich zum lokalen Compose-Stack läuft MediDoc für die Projektvorführung auf AWS
-EC2. Architektur, Einrichtung und Betrieb stehen in der
+EC2. Vollständige Einrichtung (IAM, Security Group, Elastic IP) steht in der
 [AWS-Deployment-Dokumentation](./docs/aws-deployment.md).
-### Testdaten anlegen
 
-Frisch hochgefahren ist die Datenbank leer — es gibt noch keinen Benutzer, mit dem man
-sich anmelden könnte. Ein Aufruf legt alles auf einmal an: die beiden Startbenutzer,
-200 Testpatienten und 17 Dokumente in den Akten der ersten sechs.
+### Update / Redeploy
 
-```bash
-docker compose exec fastapi python -m app.seed
-```
-
-Der Seed ist mehrfach ausführbar — Vorhandenes wird übersprungen, nicht überschrieben.
-
-**Benutzer.** Es gibt keine Selbstregistrierung; Benutzer entstehen in Sprint 1 nur über
-den Seed. Zugangsdaten und Rollen stehen in der `.env` (`SEED_ADMIN_*`, `SEED_STAFF_*`),
-die Voreinstellung aus `.env.example`:
-
-| E-Mail | Passwort | Rolle |
-| ------ | -------- | ----- |
-| `anna.admin@medidoc.test` | `geheim123` | `admin` |
-| `tom.staff@medidoc.test` | `geheim123` | `staff` |
-
-Wer andere Zugangsdaten will, ändert sie in der `.env` **vor** dem ersten Seed — ein
-zweiter Lauf erkennt den bestehenden Benutzer an seiner E-Mail und ändert kein Passwort.
-Details in [docs/auth-api.md](./docs/auth-api.md#seed-benutzer).
-
-**Patienten und Dokumente.** Beide kommen aus `backend/testdata/` und laufen dabei durch
-dieselbe Prüfung wie ein echter `POST`. Für schnelleres Ausprobieren reicht ein Teil:
+Über **EC2 → Instances → medidoc-demo → Connect → Session Manager** mit der Instanz
+verbinden, dann den vorführbaren Stand von `main` holen und neu bauen:
 
 ```bash
-docker compose exec fastapi python -m app.seed --patients 50   # nur die ersten 50
-docker compose exec fastapi python -m app.seed --no-documents  # ohne MongoDB
+cd /opt/medidoc
+sudo git pull --ff-only origin main
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Die Dokumente brauchen MongoDB (ADR-0002); fehlt `MONGO_URL`, werden sie übersprungen und
-der Rest läuft trotzdem durch. Ihre Anhänge sind Platzhalter: Name, Typ und Größe stimmen,
-die Bytes sind ein kurzer Text — ausgeliefert werden sie ohnehin nicht, einen
-Download-Endpunkt gibt es noch nicht.
+`docker-compose.prod.yml` ersetzt den `frontend`-Dienst durch einen nginx, der einen
+statischen Produktions-Build ausliefert, statt den Vite-Entwicklungsserver zu starten —
+die zusätzliche `-f`-Datei ist dafür nötig, sonst läuft dort wieder der Dev-Server.
+`--build` ist beim Frontend nicht optional: `VITE_API_URL` wird zur Build-Zeit ins
+JS-Bundle eingebacken, ein reiner Neustart würde weiterhin den alten Stand ausliefern.
 
-Bei Modelländerungen zieht `create_all` geänderte Spalten **nicht** nach. Dann hilft nur
-wegwerfen und neu seeden:
+Status und Logs prüfen:
 
 ```bash
-docker compose down -v && docker compose up -d && docker compose exec fastapi python -m app.seed
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=100
 ```
+
+Postgres und Mongo bleiben davon unberührt — bestehende Testdaten gehen beim Redeploy
+nicht verloren. Weitere Befehle (Testdaten neu anlegen, Elastic-IP-Wechsel,
+Herunterfahren) stehen in [docs/aws-deployment.md](./docs/aws-deployment.md).
 
 ## Projektstruktur
 
