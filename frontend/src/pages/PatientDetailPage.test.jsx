@@ -84,7 +84,13 @@ const documentWithoutAttachment = {
  * Die Stammdaten und die Dokumente kommen aus zwei Endpunkten; ein Mock, der
  * auf beides dasselbe antwortet, würde jeden Verwechsler durchgehen lassen.
  */
-function mockApi({ patientResponse, documentsResponse, deleteResponse, updateResponse }) {
+function mockApi({
+  patientResponse,
+  documentsResponse,
+  deleteResponse,
+  deleteDocumentResponse,
+  updateResponse,
+}) {
   apiRequest.mockImplementation((path, options) => {
     if (options?.method === "DELETE" && path.startsWith("/patients/")) {
       return typeof deleteResponse === "function"
@@ -97,6 +103,11 @@ function mockApi({ patientResponse, documentsResponse, deleteResponse, updateRes
         : Promise.resolve(patientResponse);
     }
     if (path.startsWith("/docs/")) {
+      if (options?.method === "DELETE") {
+        return typeof deleteDocumentResponse === "function"
+          ? deleteDocumentResponse(path, options)
+          : Promise.resolve(deleteDocumentResponse);
+      }
       if (options?.method === "PATCH") {
         return typeof updateResponse === "function"
           ? updateResponse(path, options)
@@ -383,6 +394,47 @@ describe("PatientDetailPage", () => {
   });
 
   describe("Löschen", () => {
+    it("sendet beim Bestätigen DELETE für das Dokument und entfernt es aus der Liste", async () => {
+      mockApi({
+        patientResponse: patient,
+        documentsResponse: page([documentWithAttachment]),
+        deleteDocumentResponse: null,
+      });
+
+      renderDetailPage();
+      await screen.findByText("MRT linkes Knie");
+
+      fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+      expect(await screen.findByText("Dokument löschen?")).toBeInTheDocument();
+      fireEvent.click(screen.getAllByRole("button", { name: "Löschen" }).at(-1));
+
+      await waitFor(() =>
+        expect(apiRequest).toHaveBeenCalledWith(
+          "/docs/7/5eed0000000000000000000000000001",
+          expect.objectContaining({ method: "DELETE", token: "stored-token" }),
+        ),
+      );
+      expect(screen.queryByText("MRT linkes Knie")).not.toBeInTheDocument();
+    });
+
+    it("zeigt einen Löschfehler und behält das Dokument bei", async () => {
+      const forbidden = new ApiError("Dazu fehlt dir die Berechtigung", 403);
+      mockApi({
+        patientResponse: patient,
+        documentsResponse: page([documentWithAttachment]),
+        deleteDocumentResponse: () => Promise.reject(forbidden),
+      });
+
+      renderDetailPage();
+      await screen.findByText("MRT linkes Knie");
+      fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+      await screen.findByText("Dokument löschen?");
+      fireEvent.click(screen.getAllByRole("button", { name: "Löschen" }).at(-1));
+
+      expect(await screen.findByText("Dazu fehlt dir die Berechtigung")).toBeInTheDocument();
+      expect(screen.getByText("MRT linkes Knie")).toBeInTheDocument();
+    });
+
     it("zeigt die Löschen-Aktion für admin", async () => {
       mockApi({ patientResponse: patient, documentsResponse: page() });
 
