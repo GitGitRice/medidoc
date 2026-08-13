@@ -22,7 +22,7 @@ Alle vier Anwendungsdienste laufen mit Docker Compose auf derselben EC2-Instanz:
 
 ```text
 Internet
-  ├── :5173 → React/Vite
+  ├── :5173 → React (nginx, Produktions-Build)
   └── :8000 → FastAPI
                     ├── PostgreSQL :5432 (nicht öffentlich)
                     └── MongoDB    :27017 (nicht öffentlich)
@@ -110,7 +110,7 @@ medidoc-demo → Connect → Session Manager → Connect** ein Browser-Terminal 
 sudo cloud-init status
 sudo tail -n 100 /var/log/medidoc-bootstrap.log
 cd /opt/medidoc
-sudo docker compose ps
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 ```
 
 Der Bootstrap ist fertig, wenn alle vier Services laufen und PostgreSQL sowie MongoDB
@@ -142,7 +142,8 @@ Datei über Session Manager bearbeiten und nur API und Frontend neu erstellen:
 ```bash
 sudo nano /opt/medidoc/.env
 cd /opt/medidoc
-sudo docker compose up -d --no-deps --force-recreate fastapi frontend
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  up -d --no-deps --force-recreate fastapi frontend
 ```
 
 Die Elastic IP bleibt bei einem Stoppen und Starten erhalten. Sie wird jedoch
@@ -156,7 +157,7 @@ Instanz zusätzlich prüfen:
 ```bash
 curl --fail http://localhost:8000/health
 cd /opt/medidoc
-sudo docker compose ps
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 ```
 
 Erwartete Health-Antwort:
@@ -180,7 +181,11 @@ User Data ausgeführt. Das Skript:
 5. erzeugt `.env` aus `.env.example` und überschreibt nur die AWS-spezifischen Werte,
 6. erzeugt zufällige Datenbank-, JWT- und Demo-Passwörter,
 7. bindet beide Datenbankports nur an die lokale Schnittstelle,
-8. startet alle Services und legt 25 erfundene Testpatienten an.
+8. startet alle Services über `docker-compose.yml` zusammen mit
+   `docker-compose.prod.yml` — Letzteres ersetzt nur den `frontend`-Dienst durch
+   einen nginx, der einen statischen Produktions-Build ausliefert, statt den
+   Vite-Entwicklungsserver zu starten,
+9. legt 25 erfundene Testpatienten an.
 
 `main` ist gemäß [ADR-0006](./adr/0006-gitflow-als-branching-modell.md) der
 vorführbare Stand. `GIT_REF` kann vor dem Aufruf des Bootstrap-Skripts auf einen Tag
@@ -205,8 +210,8 @@ Manager** eine Sitzung öffnen. Status und Logs werden dort so geprüft:
 
 ```bash
 cd /opt/medidoc
-sudo docker compose ps
-sudo docker compose logs --tail=100
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=100
 ```
 
 Den vorführbaren Stand von `main` aktualisieren und neu bauen:
@@ -214,15 +219,19 @@ Den vorführbaren Stand von `main` aktualisieren und neu bauen:
 ```bash
 cd /opt/medidoc
 sudo git pull --ff-only origin main
-sudo docker compose up -d --build
-sudo docker compose exec -T fastapi python -m app.seed --patients 25
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  exec -T fastapi python -m app.seed --patients 25
 ```
+
+Ohne die zusätzliche `-f docker-compose.prod.yml` fällt der `frontend`-Dienst auf den
+Vite-Entwicklungsserver aus `docker-compose.yml` zurück.
 
 Container anhalten, Daten-Volumes aber behalten:
 
 ```bash
 cd /opt/medidoc
-sudo docker compose down
+sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 ```
 
 `docker compose down -v` löscht zusätzlich PostgreSQL-, MongoDB- und
@@ -246,9 +255,8 @@ und das als `Delete on termination` konfigurierte Root-Volume endgültig.
 
 ## Grenzen des Demo-Deployments
 
-Das Deployment arbeitet bewusst mit HTTP, dem Vite-Entwicklungsserver, FastAPI mit
-automatischem Reload über einen Bind-Mount und ausschließlich erfundenen Testdaten.
-Es ist ein überprüfbarer Projekt- und Schulungsstand, aber keine geeignete
-Produktionsumgebung für echte Patientendaten. Für Produktion wären unter anderem
-HTTPS, eine feste Domain, Backups, getrennte Netze und ein eigener Umgang mit Secrets
-erforderlich.
+Das Deployment arbeitet bewusst mit HTTP, FastAPI mit automatischem Reload über einen
+Bind-Mount und ausschließlich erfundenen Testdaten. Es ist ein überprüfbarer Projekt-
+und Schulungsstand, aber keine geeignete Produktionsumgebung für echte Patientendaten.
+Für Produktion wären unter anderem HTTPS, eine feste Domain, Backups, getrennte Netze
+und ein eigener Umgang mit Secrets erforderlich.
