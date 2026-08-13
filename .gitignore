@@ -1,13 +1,18 @@
+# Verzeichnis-Muster stehen hier bewusst ohne Schrägstrich am Ende:
+# Ein Muster mit Schrägstrich passt nur auf echte Verzeichnisse. Heißt ein
+# Symlink so, greift es nicht und er landet über `git add -A` im Commit
+# (so kam frontend/node_modules in 020007d ins Repo, siehe #71/#72).
+
 # Dependencies
-node_modules/
-.venv/
-venv/
-__pycache__/
+node_modules
+.venv
+venv
+__pycache__
 *.py[cod]
 
 # Build output
-dist/
-build/
+dist
+build
 *.egg-info/
 
 # Environment
@@ -17,9 +22,12 @@ build/
 
 # Editor / OS
 .DS_Store
-.vscode/
-.idea/
+.vscode
+.idea
 
 # Logs
 *.log
 npm-debug.log*
+
+# Lokal hochgeladene Dokumente (im Container ein Docker-Volume)
+uploads

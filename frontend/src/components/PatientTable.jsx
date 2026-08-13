@@ -1,0 +1,92 @@
+import { useNavigate } from "react-router-dom";
+import Paper from "@mui/material/Paper";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+
+import { PaginationFooter } from "./PaginationFooter.jsx";
+import { PatientActions } from "./PatientActions.jsx";
+
+/**
+ * `date_of_birth` kommt als reines `"JJJJ-MM-TT"` vom Backend. `new Date(...)`
+ * würde das als UTC-Mitternacht lesen und je nach Zeitzone einen Tag daneben
+ * liegen — deshalb wird hier nur umsortiert, nicht geparst.
+ */
+function formatDate(isoDate) {
+  const [year, month, day] = isoDate.split("-");
+  return `${day}.${month}.${year}`;
+}
+
+/**
+ * Die Patiententabelle selbst — rein darstellend.
+ *
+ * Holt nichts nach; bekommt Daten und Seitensteuerung ausschließlich über
+ * Props. `PatientActions` prüft die Rolle für Bearbeiten selbst. Der
+ * Zeilenklick navigiert direkt, genau wie der Details-Button in
+ * `PatientActions` es für sich schon tut — kein zusätzlicher `onRowClick`
+ * als Umweg über `Overview.jsx`.
+ */
+export function PatientTable({
+  patients,
+  total,
+  page,
+  rowsPerPage,
+  onPageChange,
+  onRowsPerPageChange,
+  onEditClick,
+}) {
+  const navigate = useNavigate();
+
+  return (
+    <Paper variant="outlined">
+      <TableContainer>
+        {/* Wie in `UserTable`: schieben statt quetschen, sobald das Fenster
+            schmaler wird als die Tabelle breit ist. */}
+        <Table size="medium" sx={{ minWidth: 720 }}>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: "action.hover" }}>
+              <TableCell sx={{ fontWeight: 500 }}>Nachname</TableCell>
+              <TableCell sx={{ fontWeight: 500 }}>Vorname</TableCell>
+              <TableCell sx={{ fontWeight: 500 }}>Geburtsdatum</TableCell>
+              <TableCell sx={{ fontWeight: 500 }}>Versicherung</TableCell>
+              <TableCell
+                align="right"
+                sx={{ fontWeight: 500, width: 192, whiteSpace: "nowrap" }}
+              >
+                Aktionen
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {patients.map((patient) => (
+              <TableRow
+                key={patient.id}
+                hover
+                onClick={() => navigate(`/patients/${patient.id}`)}
+                sx={{ cursor: "pointer" }}
+              >
+                <TableCell>{patient.last_name}</TableCell>
+                <TableCell>{patient.first_name}</TableCell>
+                <TableCell>{formatDate(patient.date_of_birth)}</TableCell>
+                <TableCell>{patient.insurance_number ?? "–"}</TableCell>
+                <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                  <PatientActions patient={patient} onEditClick={onEditClick} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <PaginationFooter
+        total={total}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        onPageChange={onPageChange}
+        onRowsPerPageChange={onRowsPerPageChange}
+      />
+    </Paper>
+  );
+}

@@ -21,10 +21,11 @@ blockieren.
 
 | # | Strang | Zuständig | Inhalt Sprint 1 | Inhalt Sprint 2 |
 | - | ------ | --------- | --------------- | --------------- |
-| **A** | Infra & DevOps | _tbd_ | Docker Compose, PostgreSQL-Service, `.env`, Setup-Doku | MongoDB-Service, Volume für Anhänge, ggf. Deployment |
-| **B** | Backend & Daten | _tbd_ | SQLModel `Patient`, Seed-Daten, CRUD-Endpunkte | Dokument-Endpunkte gegen MongoDB, Datei-Upload |
+| **A** | Infra & DevOps | Dominik | Docker Compose, PostgreSQL-Service, `.env`, Setup-Doku | MongoDB-Service, Volume für Anhänge, ggf. Deployment |
+| **B** | Backend & Daten | Tiran | SQLModel `Patient`, Seed-Daten, CRUD-Endpunkte | Dokument-Endpunkte gegen MongoDB, Datei-Upload |
 | **C** | Auth | Steven | User-Model, Login-Endpunkt, Token, `AuthContext` | ggf. Rollen (siehe ADR-0004) |
-| **D** | Frontend | _tbd_ | Patientenübersicht, Detailseite, Formulare, Routing | Dokumentenansicht, Upload-UI |
+| **D** | Frontend | Farhad | Patientenübersicht, Formulare, Routing | Upload-UI |
+| **D** | Frontend | Alexander Schmidt | Detailseite, Routing | Dokumentenansicht, Upload-UI |
 
 **Bei nur drei Personen:** C geht in B auf — Auth und Backend sind dieselbe Codebasis.
 
@@ -68,19 +69,20 @@ Der Punkt, der erfahrungsgemäß am ehesten wieder aufgemacht wird, ist der
 Ein Issue ist fertig, wenn:
 
 - [ ] die Akzeptanzkriterien im Issue alle erfüllt sind
-- [ ] der Code auf `main` gemerged ist (über Pull Request, nicht direkt gepusht)
+- [ ] der Code auf `develop` gemerged ist (über Pull Request, nicht direkt gepusht)
 - [ ] jemand anderes es einmal lokal ausprobiert hat
 - [ ] `docker compose up` danach weiterhin durchläuft
 
 ## Arbeitsweise
 
-- **Branch pro Issue**, Pull Request nach `main`, ein anderes Teammitglied schaut drauf.
-  Kein direkter Push auf `main`.
+- **Branch pro Issue**, Pull Request nach `develop`, ein anderes Teammitglied schaut
+  drauf. Kein direkter Push auf `main` oder `develop` — Gitflow, siehe
+  [ADR-0006](./adr/0006-gitflow-als-branching-modell.md).
 - **Ein Issue gleichzeitig pro Person** in der Spalte *In Arbeit*. Diese eine Regel
   verhindert vier halbfertige Branches am Freitagmorgen.
 - **Ein Issue = maximal ein Tag.** Was länger dauert, sind zwei Issues. Nur so hat das
   Daily Stand-up jeden Tag etwas zu berichten.
-- **Projekttagebuch** in der README täglich vor Feierabend ergänzen.
+- **Projekttagebuch** in [docs/Diary.md](./Diary.md) täglich vor Feierabend ergänzen.
 
 ## Offene Punkte für Montag
 

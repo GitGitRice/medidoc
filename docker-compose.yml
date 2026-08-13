@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB muss in .env gesetzt sein}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER muss in .env gesetzt sein}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD muss in .env gesetzt sein}
+    ports:
+      - "${DB_BIND_IP:-0.0.0.0}:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+  mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-medidoc}
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "${DB_BIND_IP:-0.0.0.0}:${MONGO_DB_PORT:-27017}:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  fastapi:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mdoc-fastapi
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - uploads_data:/data/uploads
+    env_file:
+      - .env
+    environment:
+      # Im Compose-Netz heisst die Datenbank wie ihr Service, nicht localhost.
+      POSTGRES_HOST: postgres
+      MONGO_URL: mongodb://mongo:27017
+      UPLOAD_DIR: /data/uploads
+      LOG_JSON: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # service_healthy, nicht service_started: MongoDB haelt seit den Dokumenten
+      # nicht mehr nur den Audit-Trail, sondern auch die Angaben zu jedem
+      # Dokument. Ein "der Container laeuft" genuegt dafuer nicht.
+      mongo:
+        condition: service_healthy
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mdoc-frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      # Abhaengigkeiten aus dem Image duerfen nicht vom Bind-Mount verdeckt werden.
+      - frontend_node_modules:/app/node_modules
+    environment:
+      # Die URL wird im Browser aufgerufen; dort ist der Compose-Servicename unbekannt.
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      # Vite blockiert unbekannte Host-Header. Lokal bleibt localhost erlaubt; auf AWS
+      # wird hier der oeffentliche EC2-DNS-Name explizit gesetzt.
+      VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-localhost}
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - fastapi
+    restart: unless-stopped
+volumes:
+  postgres_data:
+  frontend_node_modules:
+  mongo_data:
+  uploads_data:

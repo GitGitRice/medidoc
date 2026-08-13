@@ -1,0 +1,17 @@
+# Ueberschreibt nur den frontend-Service aus docker-compose.yml: statt des
+# Vite-Dev-Servers (Hot-Reload, fuer lokale Entwicklung gedacht) liefert hier
+# ein statischer nginx einen einmal gebauten Produktions-Build aus.
+#
+# Verwendung: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        # Die URL wird im Browser aufgerufen; dort ist der Compose-Servicename
+        # unbekannt. Vite baeckt sie zur Build-Zeit ins JS-Bundle ein, deshalb
+        # hier als Build-Arg statt als Laufzeit-Environment.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    volumes: !reset []
+    environment: !reset {}
