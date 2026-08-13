@@ -9,6 +9,9 @@ REPOSITORY_URL="https://github.com/GitGitRice/medidoc.git"
 # kann GIT_REF vor dem Aufruf stattdessen auf einen Tag oder Commit-SHA gesetzt werden.
 GIT_REF="${GIT_REF:-main}"
 APP_DIR="/opt/medidoc"
+# docker-compose.prod.yml ersetzt nur den frontend-Service: statt des
+# Vite-Dev-Servers liefert nginx einen einmal gebauten Produktions-Build aus.
+COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.prod.yml)
 COMPOSE_VERSION="v5.1.2"
 BUILDX_VERSION="v0.17.1"
 POSTGRES_DB="medidoc"
@@ -111,8 +114,8 @@ EOF
 chown ec2-user:ec2-user /home/ec2-user/medidoc-demo-login.txt
 chmod 0600 /home/ec2-user/medidoc-demo-login.txt
 
-docker compose up -d --build --wait --wait-timeout 150
+docker compose "${COMPOSE_FILES[@]}" up -d --build --wait --wait-timeout 150
 
-docker compose exec -T fastapi python -m app.seed --patients 25
+docker compose "${COMPOSE_FILES[@]}" exec -T fastapi python -m app.seed --patients 25
 
 echo "MediDoc bootstrap completed: http://${PUBLIC_HOSTNAME}:5173"

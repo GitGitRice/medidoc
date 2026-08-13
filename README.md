@@ -119,6 +119,21 @@ Dokument-Metadaten im Volume `mongo_data` ab; die eigentlichen Anhänge liegen g
 im Volume `uploads_data`. `docker compose down` behält diese Daten, während
 `docker compose down -v` alle drei Volumes und deren Inhalte löscht.
 
+### Produktions-Build des Frontends testen
+
+`docker-compose.prod.yml` ersetzt nur den `frontend`-Dienst: statt des
+Vite-Entwicklungsservers liefert ein nginx den einmal gebauten, statischen Build aus
+`vite build` aus — so wie es auf dem [AWS-Demo-Deployment](./docs/aws-deployment.md)
+läuft. Zum lokalen Testen:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Danach ist das Frontend weiterhin unter <http://localhost:5173> erreichbar, jetzt aber
+ohne Hot-Reload. Mit `docker compose up -d --build` (ohne die zusätzliche `-f`-Datei)
+wechselt der `frontend`-Dienst wieder zurück auf den Vite-Entwicklungsserver.
+
 ### Testdaten anlegen
 
 Frisch hochgefahren ist die Datenbank leer — es gibt noch keinen Benutzer, mit dem man
